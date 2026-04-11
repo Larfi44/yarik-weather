@@ -6,14 +6,16 @@ use axum::response::IntoResponse;
 
 const PORT: u16 = 3000;
 
-#[derive(serde::Deserialize)]
+#[derive(serde::Deserialize, Debug)]
 struct WeatherResponse {
-    current_weather: CurrentWeather,
+   current: CurrentWeather, 
 }
 
-#[derive(serde::Deserialize)]
+#[derive(serde::Deserialize, Debug)]
 struct CurrentWeather {
-    temperature: f64,
+    temperature_2m: f64,
+    wind_speed_10m: f64,
+    relative_humidity_2m: f64,
 }
 
 async fn get_coordinates(city: &str) -> (f64, f64) {
@@ -40,13 +42,13 @@ async fn get_weather(Path(city): Path<String>) -> impl IntoResponse {
     let (lat, lon) = get_coordinates(&city).await;
 
     let url = format!(
-        "https://api.open-meteo.com/v1/forecast?latitude={}&longitude={}&current_weather=true",
+        "https://api.open-meteo.com/v1/forecast?latitude={}&longitude={}&current=temperature_2m,wind_speed_10m,relative_humidity_2m",
         lat, lon
     );
     
     let weather: WeatherResponse = reqwest::get(&url).await.unwrap().json().await.unwrap();
 
-    Json(weather.current_weather.temperature)
+   Json(weather.current);
 }
 
 #[tokio::main]
