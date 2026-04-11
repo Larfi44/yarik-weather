@@ -41,11 +41,22 @@ struct DailyForecast {
     temperature_2m_min: Vec<f64>,
     wind_speed_10m_max: Vec<f64>,
     weather_code: Vec<u8>,
+    sunrise: Vec<String>,
+    sunset: Vec<String>,
 }
 
 #[derive(Debug, Deserialize)]
 struct OpenMeteoArchive {
-    daily: DailyForecast,
+    daily: ArchiveDaily,
+}
+
+#[derive(Debug, Deserialize)]
+struct ArchiveDaily {
+    time: Vec<String>,
+    temperature_2m_max: Vec<f64>,
+    temperature_2m_min: Vec<f64>,
+    wind_speed_10m_max: Vec<f64>,
+    weather_code: Vec<u8>,
 }
 
 #[derive(Debug, Serialize)]
@@ -70,6 +81,9 @@ struct DailyData {
     temperature_min: f64,
     wind_speed_max: f64,
     condition: String,
+    sunrise: Option<String>,
+    sunset: Option<String>,
+    moon_phase: Option<String>,
 }
 
 fn weather_description(code: u8) -> &'static str {
@@ -136,7 +150,7 @@ async fn get_coordinates(city: &str) -> Result<(f64, f64), String> {
 
 async fn fetch_forecast(lat: f64, lon: f64) -> Result<OpenMeteoForecast, String> {
     let url = format!(
-        "https://api.open-meteo.com/v1/forecast?latitude={}&longitude={}&current=temperature_2m,wind_speed_10m,weather_code&daily=temperature_2m_max,temperature_2m_min,wind_speed_10m_max,weather_code&timezone=auto",
+        "https://api.open-meteo.com/v1/forecast?latitude={:.4}&longitude={:.4}&current=temperature_2m,wind_speed_10m,weather_code&daily=temperature_2m_max,temperature_2m_min,wind_speed_10m_max,weather_code,sunrise,sunset&timezone=auto",
         lat, lon
     );
 
@@ -158,7 +172,7 @@ async fn fetch_yesterday(lat: f64, lon: f64) -> Result<DailyData, String> {
     let yesterday = (Local::now() - Duration::days(1)).format("%Y-%m-%d").to_string();
 
     let url = format!(
-        "https://archive-api.open-meteo.com/v1/archive?latitude={}&longitude={}&start_date={}&end_date={}&daily=temperature_2m_max,temperature_2m_min,wind_speed_10m_max,weather_code&timezone=auto",
+        "https://archive-api.open-meteo.com/v1/archive?latitude={:.4}&longitude={:.4}&start_date={}&end_date={}&daily=temperature_2m_max,temperature_2m_min,wind_speed_10m_max,weather_code&timezone=auto",
         lat, lon, yesterday, yesterday
     );
 
@@ -185,6 +199,9 @@ async fn fetch_yesterday(lat: f64, lon: f64) -> Result<DailyData, String> {
         temperature_min: data.daily.temperature_2m_min[0],
         wind_speed_max: data.daily.wind_speed_10m_max[0],
         condition: weather_description(data.daily.weather_code[0]).to_string(),
+        sunrise: None,
+        sunset: None,
+        moon_phase: None,
     })
 }
 
@@ -224,6 +241,9 @@ async fn get_weather(Path(city): Path<String>) -> impl IntoResponse {
             temperature_min: daily.temperature_2m_min[i],
             wind_speed_max: daily.wind_speed_10m_max[i],
             condition: weather_description(daily.weather_code[i]).to_string(),
+            sunrise: Some(daily.sunrise[i].clone()),
+            sunset: Some(daily.sunset[i].clone()),
+            moon_phase: None,
         })
         .collect();
 
