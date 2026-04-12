@@ -7,9 +7,9 @@ use serde::{Deserialize, Serialize};
 static CSS: Asset = asset!("/assets/main.css");
 const FAVICON: Asset = asset!("/assets/favicon.svg");
 const ANDROID_ICON: Asset = asset!("/assets/android.png");
-const APPLE_ICON: Asset = asset!("/assets/apple.jpg");
+const APPLE_ICON: Asset = asset!("/assets/apple.svg");
 const LINUX_ICON: Asset = asset!("/assets/linux.png");
-const WINDOWS_ICON: Asset = asset!("/assets/windows.png");
+const WINDOWS_ICON: Asset = asset!("/assets/windows.svg");
 
 const API_URL: &str = "http://127.0.0.1:3000/get_weather";
 
@@ -158,6 +158,44 @@ fn month_name_ru(month: u32) -> &'static str {
         5 => "мая", 6 => "июня", 7 => "июля", 8 => "августа",
         9 => "сентября", 10 => "октября", 11 => "ноября", 12 => "декабря",
         _ => "",
+    }
+}
+
+fn translate_condition(condition_en: &str, lang: &Language) -> String {
+    if *lang == Language::English {
+        return condition_en.to_string();
+    }
+    // Match against the English strings returned by backend
+    match condition_en {
+        "Clear sky" => "Ясно".to_string(),
+        "Mainly clear" => "Преимущественно ясно".to_string(),
+        "Partly cloudy" => "Переменная облачность".to_string(),
+        "Overcast" => "Пасмурно".to_string(),
+        "Fog" => "Туман".to_string(),
+        "Depositing rime fog" => "Изморозь".to_string(),
+        "Light drizzle" => "Лёгкая морось".to_string(),
+        "Moderate drizzle" => "Умеренная морось".to_string(),
+        "Dense drizzle" => "Сильная морось".to_string(),
+        "Light freezing drizzle" => "Лёгкая переохлаждённая морось".to_string(),
+        "Dense freezing drizzle" => "Сильная переохлаждённая морось".to_string(),
+        "Slight rain" => "Небольшой дождь".to_string(),
+        "Moderate rain" => "Умеренный дождь".to_string(),
+        "Heavy rain" => "Сильный дождь".to_string(),
+        "Light freezing rain" => "Лёгкий ледяной дождь".to_string(),
+        "Heavy freezing rain" => "Сильный ледяной дождь".to_string(),
+        "Slight snow fall" => "Небольшой снег".to_string(),
+        "Moderate snow fall" => "Умеренный снег".to_string(),
+        "Heavy snow fall" => "Сильный снег".to_string(),
+        "Snow grains" => "Снежные зёрна".to_string(),
+        "Slight rain showers" => "Небольшие ливни".to_string(),
+        "Moderate rain showers" => "Умеренные ливни".to_string(),
+        "Violent rain showers" => "Сильные ливни".to_string(),
+        "Slight snow showers" => "Небольшой снегопад".to_string(),
+        "Heavy snow showers" => "Сильный снегопад".to_string(),
+        "Thunderstorm" => "Гроза".to_string(),
+        "Thunderstorm with slight hail" => "Гроза с небольшим градом".to_string(),
+        "Thunderstorm with heavy hail" => "Гроза с сильным градом".to_string(),
+        _ => condition_en.to_string(), // fallback to English
     }
 }
 
@@ -445,9 +483,9 @@ fn SettingsModal(
                             };
                             temp_settings.write().temp_unit = unit;
                         },
-                        option { value: "Celsius", "Celsius (°C)" }
-                        option { value: "Fahrenheit", "Fahrenheit (°F)" }
-                        option { value: "Kelvin", "Kelvin (K)" }
+                        option { value: "Celsius", if lang == Language::English { "Celsius (°C)" } else { "Цельсий (°C)" } }
+                        option { value: "Fahrenheit", if lang == Language::English { "Fahrenheit (°F)" } else { "Фаренгейт (°F)" } }
+                        option { value: "Kelvin", if lang == Language::English { "Kelvin (K)" } else { "Кельвин (K)" } }
                     }
                 }
 
@@ -469,9 +507,9 @@ fn SettingsModal(
                             };
                             temp_settings.write().wind_unit = unit;
                         },
-                        option { value: "m/s", "m/s" }
-                        option { value: "km/h", "km/h" }
-                        option { value: "mph", "mph" }
+                       option { value: "m/s", if lang == Language::English { "m/s" } else { "м/с" } }
+                        option { value: "km/h", if lang == Language::English { "km/h" } else { "км/ч" } }
+                        option { value: "mph", if lang == Language::English { "mph" } else { "миль/ч" } }
                     }
                 }
 
@@ -581,9 +619,9 @@ fn WelcomeModal(on_complete: EventHandler<UserSettings>) -> Element {
                             };
                             temp_settings.write().temp_unit = unit;
                         },
-                        option { value: "Celsius", "Celsius (°C)" }
-                        option { value: "Fahrenheit", "Fahrenheit (°F)" }
-                        option { value: "Kelvin", "Kelvin (K)" }
+                        option { value: "Celsius", if lang == Language::English { "Celsius (°C)" } else { "Цельсий (°C)" } }
+                        option { value: "Fahrenheit", if lang == Language::English { "Fahrenheit (°F)" } else { "Фаренгейт (°F)" } }
+                        option { value: "Kelvin", if lang == Language::English { "Kelvin (K)" } else { "Кельвин (K)" } }
                     }
                 }
 
@@ -604,9 +642,9 @@ fn WelcomeModal(on_complete: EventHandler<UserSettings>) -> Element {
                             };
                             temp_settings.write().wind_unit = unit;
                         },
-                        option { value: "m/s", "m/s" }
-                        option { value: "km/h", "km/h" }
-                        option { value: "mph", "mph" }
+                        option { value: "m/s", if lang == Language::English { "m/s" } else { "м/с" } }
+                        option { value: "km/h", if lang == Language::English { "km/h" } else { "км/ч" } }
+                        option { value: "mph", if lang == Language::English { "mph" } else { "миль/ч" } }
                     }
                 }
 
@@ -700,16 +738,16 @@ fn WeatherDisplay(
     };
 
     let wind_unit_str = match wind_unit {
-        WindUnit::Mps => {
-            if lang == Language::English {
-                "m/s"
-            } else {
-                "м/с"
-            }
-        }
-        WindUnit::Kmph => "km/h",
-        WindUnit::Mph => "mph",
-    };
+    WindUnit::Mps => {
+        if lang == Language::English { "m/s" } else { "м/с" }
+    }
+    WindUnit::Kmph => {
+        if lang == Language::English { "km/h" } else { "км/ч" }
+    }
+    WindUnit::Mph => {
+        if lang == Language::English { "mph" } else { "миль/ч" }
+    }
+};
 
     let condition_icon_str = condition_icon_from_text(&data.current.condition);
 
@@ -726,7 +764,7 @@ fn WeatherDisplay(
 
                 div { class: "condition-line",
                     span { class: "condition-icon", "{condition_icon_str}" }
-                    span { class: "condition-text", "{data.current.condition}" }
+                    span { class: "condition-text", "{translate_condition(&data.current.condition, &lang)}" }
                 }
 
                 div { class: "weather-details",
@@ -767,8 +805,17 @@ fn WeatherDisplay(
                                     div { class: "bar-value", {format!("{:.0}{}", f.temperature_max, temp_unit_str)} }
                                     div { class: "bar-min", {format!("{:.0}{}", f.temperature_min, temp_unit_str)} }
                                     div { class: "bar-icon", "{icon}" }
-                                    div { class: "bar-text", "{f.condition}" }
-                                    div { class: "bar-wind", {format!("wind: {:.1} {}", f.wind_speed_max, wind_unit_str)} }
+                                    div { class: "bar-text", "{translate_condition(&f.condition, &lang)}" }
+                                    div { class: "bar-wind",
+                                        {
+                                            format!(
+                                                "{} {:.1} {}",
+                                                if lang == Language::English { "wind:" } else { "ветер:" },
+                                                f.wind_speed_max,
+                                                wind_unit_str
+                                            )
+                                        }
+                                    }
                                 }
                             }
                         }
