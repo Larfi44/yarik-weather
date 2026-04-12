@@ -1,1 +1,25 @@
-/target
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Backend (Rust)
+backend/target/
+backend/*.rs.bk
+backend/Cargo.lock   # Optional: commit for apps, ignore for libs
+
+# Frontend (Dioxus)
+frontend/target/
+frontend/*.rs.bk
+
+# Build artifacts
+*.exe
+*.o
+*.so
+*.dylib

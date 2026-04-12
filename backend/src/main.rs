@@ -7,6 +7,7 @@ use axum::{
 use chrono::{Duration, Local};
 use reqwest::StatusCode;
 use serde::{Deserialize, Serialize};
+use tower_http::cors::{CorsLayer, Any};
 
 const PORT: u16 = 3000;
 
@@ -259,7 +260,12 @@ async fn get_weather(Path(city): Path<String>) -> impl IntoResponse {
 
 #[tokio::main]
 async fn main() {
-    let app = Router::new().route("/get_weather/{city}", get(get_weather));
+    let cors = CorsLayer::new()
+        .allow_origin(Any)
+        .allow_methods(Any)
+        .allow_headers(Any);
+
+    let app = Router::new().route("/get_weather/{city}", get(get_weather)).layer(cors);
 
     let listener = tokio::net::TcpListener::bind(format!("0.0.0.0:{PORT}"))
         .await
