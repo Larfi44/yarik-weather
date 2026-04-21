@@ -7,7 +7,8 @@ use serde::{Deserialize, Serialize};
 static CSS: Asset = asset!("/assets/main.css");
 const FAVICON: Asset = asset!("/assets/favicon.svg");
 const ANDROID_ICON: Asset = asset!("/assets/android.png");
-const APPLE_ICON: Asset = asset!("/assets/apple.svg");
+const APPLE_LIGHT: Asset = asset!("/assets/apple-light.svg");
+const APPLE_DARK: Asset = asset!("/assets/apple-dark.svg");
 const LINUX_ICON: Asset = asset!("/assets/linux.png");
 const WINDOWS_ICON: Asset = asset!("/assets/windows.svg");
 
@@ -50,6 +51,13 @@ pub enum TempUnit {
     Kelvin,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+pub enum Theme {
+    Auto,
+    Light,
+    Dark,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum WindUnit {
     Mps,
@@ -64,19 +72,12 @@ pub enum Language {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub enum ThemeMode {
-    System,
-    Light,
-    Dark,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct UserSettings {
     pub temp_unit: TempUnit,
     pub wind_unit: WindUnit,
     pub language: Language,
-    pub theme: ThemeMode,
     pub default_city: String,
+    pub theme: Theme,
     pub first_time: bool,
 }
 
@@ -88,10 +89,18 @@ impl Default for UserSettings {
             temp_unit: TempUnit::Celsius,
             wind_unit: WindUnit::Mps,
             language: Language::English,
-            theme: ThemeMode::System,
-            default_city: "Simferopol".to_string(),
+            default_city: String::new(),
+            theme: Theme::Auto,
             first_time: true,
         }
+    }
+}
+
+fn apple_icon(theme: Theme) -> Asset {
+    match theme {
+        Theme::Light => APPLE_DARK,
+        Theme::Dark => APPLE_LIGHT,
+        Theme::Auto => APPLE_LIGHT,
     }
 }
 
@@ -103,11 +112,11 @@ fn save_settings(settings: &UserSettings) {
     let _ = LocalStorage::set(SETTINGS_KEY, settings);
 }
 
-fn cycle_theme(theme: &ThemeMode) -> ThemeMode {
+fn cycle_theme(theme: Theme) -> Theme {
     match theme {
-        ThemeMode::System => ThemeMode::Light,
-        ThemeMode::Light => ThemeMode::Dark,
-        ThemeMode::Dark => ThemeMode::System,
+        Theme::Auto => Theme::Light,
+        Theme::Light => Theme::Dark,
+        Theme::Dark => Theme::Auto,
     }
 }
 
@@ -119,11 +128,11 @@ fn choice_btn_class(active: bool) -> &'static str {
     }
 }
 
-fn theme_icon(theme: &ThemeMode) -> &'static str {
+fn theme_icon(theme: Theme) -> &'static str {
     match theme {
-        ThemeMode::System => "🌓",
-        ThemeMode::Light => "☀️",
-        ThemeMode::Dark => "🌙",
+        Theme::Auto => "🌓",
+        Theme::Light => "☀️",
+        Theme::Dark => "🌙",
     }
 }
 
@@ -131,6 +140,13 @@ fn language_value(lang: &Language) -> &'static str {
     match lang {
         Language::English => "English",
         Language::Russian => "Russian",
+    }
+}
+
+fn resolve_theme(theme: Theme) -> Theme {
+    match theme {
+        Theme::Auto => Theme::Light,
+        _ => theme,
     }
 }
 
@@ -150,14 +166,14 @@ fn wind_unit_value(unit: &WindUnit) -> &'static str {
     }
 }
 
-fn theme_label(theme: &ThemeMode, lang: &Language) -> &'static str {
+fn theme_label(theme: &Theme, lang: &Language) -> &'static str {
     match (theme, lang) {
-        (ThemeMode::System, Language::English) => "Auto",
-        (ThemeMode::Light, Language::English) => "Light",
-        (ThemeMode::Dark, Language::English) => "Dark",
-        (ThemeMode::System, Language::Russian) => "Авто",
-        (ThemeMode::Light, Language::Russian) => "Светлая",
-        (ThemeMode::Dark, Language::Russian) => "Тёмная",
+        (Theme::Auto, Language::English) => "Auto",
+        (Theme::Light, Language::English) => "Light",
+        (Theme::Dark, Language::English) => "Dark",
+        (Theme::Auto, Language::Russian) => "Авто",
+        (Theme::Light, Language::Russian) => "Светлая",
+        (Theme::Dark, Language::Russian) => "Тёмная",
     }
 }
 
@@ -468,7 +484,7 @@ fn download_url(os: DownloadOs) -> &'static str {
 }
 
 #[component]
-fn DownloadModal(lang: Language, on_close: EventHandler<()>) -> Element {
+fn DownloadModal(lang: Language, theme: Theme, on_close: EventHandler<()>) -> Element {
     let mut selected = use_signal(|| DownloadOs::Android);
 
     rsx! {
@@ -505,7 +521,7 @@ fn DownloadModal(lang: Language, on_close: EventHandler<()>) -> Element {
                             let icon = match os {
                                 DownloadOs::Android => ANDROID_ICON,
                                 DownloadOs::Windows => WINDOWS_ICON,
-                                DownloadOs::MacOS => APPLE_ICON,
+                                DownloadOs::MacOS => apple_icon(theme),
                                 DownloadOs::Linux => LINUX_ICON,
                             };
 
@@ -546,6 +562,13 @@ fn SettingsModal(
     let mut temp_settings = use_signal(|| settings.clone());
     let lang = temp_settings().language.clone();
 
+    let handle_close = move |_| {
+        let new_settings = temp_settings();
+        save_settings(&new_settings);
+        on_save.call(new_settings);
+        on_close.call(());
+    };
+
     rsx! {
         div { class: "modal-overlay",
             div { class: "modal",
@@ -557,13 +580,10 @@ fn SettingsModal(
                             "Настройки"
                         }
                     }
-                    button {
-                        class: "close-btn",
-                        onclick: move |_| on_close.call(()),
-                        "✖"
-                    }
+                    button { class: "close-btn", onclick: handle_close, "✖" }
                 }
 
+                // All setting rows (unchanged)
                 div { class: "setting-row",
                     label {
                         if lang == Language::English {
@@ -674,8 +694,8 @@ fn SettingsModal(
                     }
                     div { class: "choice-group",
                         button {
-                            class: choice_btn_class(temp_settings().theme == ThemeMode::System),
-                            onclick: move |_| temp_settings.write().theme = ThemeMode::System,
+                            class: choice_btn_class(temp_settings().theme == Theme::Auto),
+                            onclick: move |_| temp_settings.write().theme = Theme::Auto,
                             if lang == Language::English {
                                 "Auto"
                             } else {
@@ -683,8 +703,8 @@ fn SettingsModal(
                             }
                         }
                         button {
-                            class: choice_btn_class(temp_settings().theme == ThemeMode::Light),
-                            onclick: move |_| temp_settings.write().theme = ThemeMode::Light,
+                            class: choice_btn_class(temp_settings().theme == Theme::Light),
+                            onclick: move |_| temp_settings.write().theme = Theme::Light,
                             if lang == Language::English {
                                 "Light"
                             } else {
@@ -692,8 +712,8 @@ fn SettingsModal(
                             }
                         }
                         button {
-                            class: choice_btn_class(temp_settings().theme == ThemeMode::Dark),
-                            onclick: move |_| temp_settings.write().theme = ThemeMode::Dark,
+                            class: choice_btn_class(temp_settings().theme == Theme::Dark),
+                            onclick: move |_| temp_settings.write().theme = Theme::Dark,
                             if lang == Language::English {
                                 "Dark"
                             } else {
@@ -717,31 +737,8 @@ fn SettingsModal(
                         oninput: move |e| temp_settings.write().default_city = e.value(),
                     }
                 }
-
-                div { class: "modal-actions",
-                    button {
-                        class: "secondary-btn",
-                        onclick: move |_| on_close.call(()),
-                        if lang == Language::English {
-                            "Cancel"
-                        } else {
-                            "Отмена"
-                        }
-                    }
-                    button {
-                        class: "primary-btn",
-                        onclick: move |_| {
-                            let new_settings = temp_settings();
-                            save_settings(&new_settings);
-                            on_save.call(new_settings);
-                        },
-                        if lang == Language::English {
-                            "Save"
-                        } else {
-                            "Сохранить"
-                        }
-                    }
-                }
+            
+            // Removed the modal-actions div entirely
             }
         }
     }
@@ -881,8 +878,8 @@ fn WelcomeModal(on_complete: EventHandler<UserSettings>) -> Element {
                     }
                     div { class: "choice-group",
                         button {
-                            class: choice_btn_class(temp_settings().theme == ThemeMode::System),
-                            onclick: move |_| temp_settings.write().theme = ThemeMode::System,
+                            class: choice_btn_class(temp_settings().theme == Theme::Auto),
+                            onclick: move |_| temp_settings.write().theme = Theme::Auto,
                             if lang == Language::English {
                                 "Auto"
                             } else {
@@ -890,8 +887,8 @@ fn WelcomeModal(on_complete: EventHandler<UserSettings>) -> Element {
                             }
                         }
                         button {
-                            class: choice_btn_class(temp_settings().theme == ThemeMode::Light),
-                            onclick: move |_| temp_settings.write().theme = ThemeMode::Light,
+                            class: choice_btn_class(temp_settings().theme == Theme::Light),
+                            onclick: move |_| temp_settings.write().theme = Theme::Light,
                             if lang == Language::English {
                                 "Light"
                             } else {
@@ -899,8 +896,8 @@ fn WelcomeModal(on_complete: EventHandler<UserSettings>) -> Element {
                             }
                         }
                         button {
-                            class: choice_btn_class(temp_settings().theme == ThemeMode::Dark),
-                            onclick: move |_| temp_settings.write().theme = ThemeMode::Dark,
+                            class: choice_btn_class(temp_settings().theme == Theme::Dark),
+                            onclick: move |_| temp_settings.write().theme = Theme::Dark,
                             if lang == Language::English {
                                 "Dark"
                             } else {
@@ -1123,12 +1120,112 @@ fn WeatherDisplay(
                                 }
                             }
 
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
 
-
-
-
-
-
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
                             div { class: "astronomy-grid",
                                 div { class: "astro-card",
                                     p {
@@ -1150,7 +1247,7 @@ fn WeatherDisplay(
                                         }
                                     }
                                 }
-
+        
                                 div { class: "astro-card",
                                     p { "{moon_emoji}" }
                                     p { "{translate_moon_phase(&moon_phase, &lang)}" }
@@ -1187,19 +1284,27 @@ fn main() {
 #[component]
 fn App() -> Element {
     let mut settings = use_signal(get_settings);
-    let mut weather = use_signal(|| None::<WeatherResponse>);
-    let mut loading = use_signal(|| false);
-    let mut error = use_signal(|| None::<String>);
+    // let theme = resolve_theme(settings().theme);
+
+    // let android_icon = ANDROID_ICON;
+    // let windows_icon = WINDOWS_ICON;
+    // let linux_icon = LINUX_ICON;
+    // let apple_icon = apple_icon(theme);
+    let weather = use_signal(|| None::<WeatherResponse>);
+    let loading = use_signal(|| false);
+    let error = use_signal(|| None::<String>);
     let mut show_settings = use_signal(|| false);
     let mut show_welcome = use_signal(|| settings().first_time);
     let mut show_downloads = use_signal(|| false);
     let mut initial_fetch_done = use_signal(|| false);
 
-    let lang = settings().language.clone();
-    let theme_class = match settings().theme {
-        ThemeMode::System => "theme-system",
-        ThemeMode::Light => "theme-light",
-        ThemeMode::Dark => "theme-dark",
+    let lang: Language = settings().language.clone();
+    let resolved_theme = resolve_theme(settings().theme);
+
+    let theme_class = match resolved_theme {
+        Theme::Light => "theme-light",
+        Theme::Dark => "theme-dark",
+        Theme::Auto => "theme-light",
     };
 
     let fetch_and_set = {
@@ -1262,15 +1367,11 @@ fn App() -> Element {
                             class: "icon-btn",
                             onclick: move |_| {
                                 let mut new_settings = settings();
-                                new_settings.theme = cycle_theme(&new_settings.theme);
+                                new_settings.theme = cycle_theme(new_settings.theme);
                                 save_settings(&new_settings);
                                 settings.set(new_settings);
                             },
-                            match &settings().theme {
-                                ThemeMode::System => "🌓",
-                                ThemeMode::Light => "☀️",
-                                ThemeMode::Dark => "🌙",
-                            }
+                            {theme_icon(settings().theme)}
                         }
                         button {
                             class: "icon-btn",
@@ -1354,6 +1455,7 @@ fn App() -> Element {
                 if show_downloads() {
                     DownloadModal {
                         lang: settings().language.clone(),
+                        theme: settings().theme,
                         on_close: move |_| show_downloads.set(false),
                     }
                 }

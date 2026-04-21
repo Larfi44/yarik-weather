@@ -5,7 +5,7 @@ use std::{collections::HashMap, f64::consts::PI};
 use tower_http::cors::{Any, CorsLayer};
 
 const PORT: u16 = 3000;
-const MOON_API_KEY: &str = "YOUR_API_KEY_HERE";
+const MOON_API_KEY: &str = "MOON_API_KEY";
 
 // ---------- Geocoding ----------
 #[derive(Debug, Deserialize)]
@@ -74,7 +74,6 @@ struct MoonDay {
 struct MoonPhaseInfo {
     name: String,
     illumination: f64,
-    is_waxing: Option<bool>,
 }
 
 // ---------- Unified Response ----------
@@ -157,7 +156,7 @@ fn moon_phase_for_date(date: NaiveDate) -> (String, f64) {
         age += SYNODIC_MONTH;
     }
 
-    let illumination = ((1.0 - (2.0 * PI * age / SYNODIC_MONTH).cos()) / 2.0) * 100.0;
+    let illumination: f64 = ((1.0 - (2.0 * PI * age / SYNODIC_MONTH).cos()) / 2.0) * 100.0;
 
     let phase_name = match age {
         a if a < 1.84566 => "New Moon",

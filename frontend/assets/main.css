@@ -502,6 +502,12 @@ select {
     object-fit: contain;
 }
 
+.download-card-icon svg {
+    width: 100%;
+    height: 100%;
+    fill: currentColor;
+}
+
 .download-card-title {
     font-weight: 800;
     font-size: 1.05rem;
@@ -565,6 +571,14 @@ select {
         radial-gradient(circle at top left, rgba(74, 163, 255, 0.18), transparent 30%),
         radial-gradient(circle at bottom right, rgba(124, 199, 255, 0.18), transparent 32%),
         linear-gradient(180deg, var(--bg1), var(--bg2));
+}
+
+.theme-light .header.glass-card .icon-btn {
+    background: rgba(0, 0, 0, 0.05);
+}
+
+.theme-light .header.glass-card .icon-btn:hover {
+    background: rgba(0, 0, 0, 0.12);
 }
 
 .theme-dark {
