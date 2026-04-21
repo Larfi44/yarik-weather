@@ -10,6 +10,16 @@
     --danger: #ff6b7a;
     --border: rgba(255, 255, 255, 0.12);
     --shadow: 0 18px 50px rgba(0, 0, 0, 0.28);
+    --input-bg: rgba(255, 255, 255, 0.07);
+    --input-text: #f4f7fb;
+    --input-placeholder: rgba(244, 247, 251, 0.45);
+    --btn-bg: rgba(255, 255, 255, 0.08);
+    --glass-bg: rgba(255, 255, 255, 0.05);
+    --glass-border: rgba(255, 255, 255, 0.08);
+    --bg-gradient:
+        radial-gradient(circle at top left, rgba(110, 231, 255, 0.16), transparent 28%),
+        radial-gradient(circle at bottom right, rgba(124, 219, 122, 0.14), transparent 30%),
+        linear-gradient(180deg, var(--bg1), var(--bg2));
 }
 
 * {
@@ -21,20 +31,19 @@ body {
     margin: 0;
     min-height: 100%;
     font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-    background:
-        radial-gradient(circle at top left, rgba(110, 231, 255, 0.16), transparent 28%),
-        radial-gradient(circle at bottom right, rgba(124, 219, 122, 0.14), transparent 30%),
-        linear-gradient(180deg, var(--bg1), var(--bg2));
     color: var(--text);
 }
 
 body {
     min-height: 100vh;
+    background: #050814;
 }
 
 .app-shell {
     min-height: 100vh;
     padding: 24px;
+    background: var(--bg-gradient);
+    color: var(--text);
 }
 
 .app-container {
@@ -54,16 +63,9 @@ body {
     box-shadow: var(--shadow);
 }
 
-/* Remove the problematic .glass-card rule that forced flex on all cards */
-/* .glass-card {
-    display: flex;
-    align-items: center;
-} */
-
 .header {
     display: flex;
     flex-direction: column;
-    align-items: center;
     align-items: center;
     justify-content: space-between;
     gap: 16px;
@@ -106,14 +108,14 @@ h1 {
     cursor: pointer;
     border-radius: 16px;
     font-weight: 700;
-    transition: transform 0.15s ease, opacity 0.15s ease, background 0.15s ease;
+    transition: transform 0.15s ease, opacity 0.15s ease, background 0.15s ease, border-color 0.15s ease;
 }
 
 .icon-btn {
     width: 48px;
     height: 48px;
     font-size: 1.2rem;
-    background: rgba(255, 255, 255, 0.08);
+    background: var(--btn-bg);
     color: var(--text);
 }
 
@@ -140,8 +142,8 @@ select {
     width: 100%;
     border-radius: 16px;
     border: 1px solid var(--border);
-    background: rgba(255, 255, 255, 0.07);
-    color: var(--text);
+    background: var(--input-bg);
+    color: var(--input-text);
     outline: none;
     padding: 14px 16px;
     font-size: 1rem;
@@ -149,7 +151,7 @@ select {
 
 .city-input::placeholder,
 .text-input::placeholder {
-    color: rgba(244, 247, 251, 0.45);
+    color: var(--input-placeholder);
 }
 
 .search-btn {
@@ -167,7 +169,7 @@ select {
 
 .secondary-btn {
     padding: 14px 18px;
-    background: rgba(255, 255, 255, 0.08);
+    background: var(--btn-bg);
     color: var(--text);
 }
 
@@ -210,7 +212,6 @@ select {
     width: 100%;
 }
 
-/* Center content in all main weather cards */
 .current-weather,
 .forecast-section,
 .astronomy-section {
@@ -309,15 +310,15 @@ select {
     min-height: 250px;
     padding: 12px 10px;
     border-radius: 22px;
-    background: rgba(255, 255, 255, 0.05);
-    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: flex-end;
     gap: 6px;
     text-align: center;
-    transition: transform 0.2s ease, background 0.2s ease;
+    transition: transform 0.2s ease, background 0.2s ease, border-color 0.2s ease;
     cursor: pointer;
 }
 
@@ -391,8 +392,8 @@ select {
 .astro-card {
     padding: 14px;
     border-radius: 20px;
-    background: rgba(255, 255, 255, 0.05);
-    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
     text-align: center;
 }
 
@@ -442,7 +443,7 @@ select {
 .close-btn {
     width: 44px;
     height: 44px;
-    background: rgba(255, 255, 255, 0.08);
+    background: var(--btn-bg);
     color: var(--text);
 }
 
@@ -475,8 +476,8 @@ select {
 .download-card {
     padding: 16px;
     border-radius: 22px;
-    background: rgba(255, 255, 255, 0.05);
-    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
     cursor: pointer;
     transition: transform 0.15s ease, border-color 0.15s ease, background 0.15s ease;
     display: flex;
@@ -513,6 +514,144 @@ select {
 
 .download-confirm-btn {
     width: 100%;
+}
+
+.choice-group {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.choice-btn {
+    padding: 0.6rem 0.9rem;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    background: var(--btn-bg);
+    color: var(--text);
+    cursor: pointer;
+    font-weight: 700;
+    transition: transform 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+}
+
+.choice-btn:hover {
+    transform: translateY(-1px);
+}
+
+.choice-btn.active {
+    transform: translateY(-1px);
+    font-weight: 800;
+    border-color: currentColor;
+}
+
+.theme-light {
+    --bg1: #eaf4ff;
+    --bg2: #d9ecff;
+    --card: rgba(255, 255, 255, 0.72);
+    --card2: rgba(255, 255, 255, 0.45);
+    --text: #0f172a;
+    --muted: rgba(15, 23, 42, 0.65);
+    --accent: #4aa3ff;
+    --accent2: #7cc7ff;
+    --danger: #ef6b7a;
+    --border: rgba(74, 163, 255, 0.16);
+    --shadow: 0 18px 50px rgba(49, 90, 145, 0.16);
+    --input-bg: rgba(255, 255, 255, 0.88);
+    --input-text: #0f172a;
+    --input-placeholder: rgba(15, 23, 42, 0.45);
+    --btn-bg: rgba(255, 255, 255, 0.76);
+    --glass-bg: rgba(255, 255, 255, 0.62);
+    --glass-border: rgba(74, 163, 255, 0.14);
+    --bg-gradient:
+        radial-gradient(circle at top left, rgba(74, 163, 255, 0.18), transparent 30%),
+        radial-gradient(circle at bottom right, rgba(124, 199, 255, 0.18), transparent 32%),
+        linear-gradient(180deg, var(--bg1), var(--bg2));
+}
+
+.theme-dark {
+    --bg1: #0b1220;
+    --bg2: #10192d;
+    --card: rgba(18, 26, 44, 0.75);
+    --card2: rgba(255, 255, 255, 0.08);
+    --text: #f4f7fb;
+    --muted: rgba(244, 247, 251, 0.7);
+    --accent: #6ee7ff;
+    --accent2: #7cdb7a;
+    --danger: #ff6b7a;
+    --border: rgba(255, 255, 255, 0.12);
+    --shadow: 0 18px 50px rgba(0, 0, 0, 0.28);
+    --input-bg: rgba(255, 255, 255, 0.07);
+    --input-text: #f4f7fb;
+    --input-placeholder: rgba(244, 247, 251, 0.45);
+    --btn-bg: rgba(255, 255, 255, 0.08);
+    --glass-bg: rgba(255, 255, 255, 0.05);
+    --glass-border: rgba(255, 255, 255, 0.08);
+    --bg-gradient:
+        radial-gradient(circle at top left, rgba(110, 231, 255, 0.16), transparent 28%),
+        radial-gradient(circle at bottom right, rgba(124, 219, 122, 0.14), transparent 30%),
+        linear-gradient(180deg, var(--bg1), var(--bg2));
+}
+
+.theme-system {
+    --bg1: #0b1220;
+    --bg2: #10192d;
+    --card: rgba(18, 26, 44, 0.75);
+    --card2: rgba(255, 255, 255, 0.08);
+    --text: #f4f7fb;
+    --muted: rgba(244, 247, 251, 0.7);
+    --accent: #6ee7ff;
+    --accent2: #7cdb7a;
+    --danger: #ff6b7a;
+    --border: rgba(255, 255, 255, 0.12);
+    --shadow: 0 18px 50px rgba(0, 0, 0, 0.28);
+    --input-bg: rgba(255, 255, 255, 0.07);
+    --input-text: #f4f7fb;
+    --input-placeholder: rgba(244, 247, 251, 0.45);
+    --btn-bg: rgba(255, 255, 255, 0.08);
+    --glass-bg: rgba(255, 255, 255, 0.05);
+    --glass-border: rgba(255, 255, 255, 0.08);
+    --bg-gradient:
+        radial-gradient(circle at top left, rgba(110, 231, 255, 0.16), transparent 28%),
+        radial-gradient(circle at bottom right, rgba(124, 219, 122, 0.14), transparent 30%),
+        linear-gradient(180deg, var(--bg1), var(--bg2));
+}
+
+.theme-light .city-input,
+.theme-light .text-input,
+.theme-light select {
+    background: rgba(255, 255, 255, 0.88);
+    color: #0f172a;
+    border: 1px solid rgba(74, 163, 255, 0.18);
+}
+
+.theme-light .city-input::placeholder,
+.theme-light .text-input::placeholder {
+    color: rgba(15, 23, 42, 0.45);
+}
+
+@media (prefers-color-scheme: dark) {
+    .theme-system {
+        --bg1: #0b1220;
+        --bg2: #10192d;
+        --card: rgba(18, 26, 44, 0.75);
+        --card2: rgba(255, 255, 255, 0.08);
+        --text: #f4f7fb;
+        --muted: rgba(244, 247, 251, 0.7);
+        --accent: #6ee7ff;
+        --accent2: #7cdb7a;
+        --danger: #ff6b7a;
+        --border: rgba(255, 255, 255, 0.12);
+        --shadow: 0 18px 50px rgba(0, 0, 0, 0.28);
+        --input-bg: rgba(255, 255, 255, 0.07);
+        --input-text: #f4f7fb;
+        --input-placeholder: rgba(244, 247, 251, 0.45);
+        --btn-bg: rgba(255, 255, 255, 0.08);
+        --glass-bg: rgba(255, 255, 255, 0.05);
+        --glass-border: rgba(255, 255, 255, 0.08);
+        --bg-gradient:
+            radial-gradient(circle at top left, rgba(110, 231, 255, 0.16), transparent 28%),
+            radial-gradient(circle at bottom right, rgba(124, 219, 122, 0.14), transparent 30%),
+            linear-gradient(180deg, var(--bg1), var(--bg2));
+    }
 }
 
 @media (max-width: 900px) {

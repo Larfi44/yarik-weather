@@ -13,7 +13,7 @@ const WINDOWS_ICON: Asset = asset!("/assets/windows.svg");
 
 const API_URL: &str = "http://127.0.0.1:3000/get_weather";
 
-// ---------- Types (Updated to match backend) ----------
+// ---------- Types ----------
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct WeatherResponse {
     pub city: String,
@@ -38,10 +38,11 @@ pub struct DailyData {
     pub condition: String,
     pub sunrise: Option<String>,
     pub sunset: Option<String>,
-    pub moon_phase: Option<String>,
+    pub moon_phase_name: Option<String>,
+    pub moon_illumination: Option<f64>,
 }
 
-// ---------- Settings (unchanged) ----------
+// ---------- Settings ----------
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum TempUnit {
     Celsius,
@@ -63,10 +64,18 @@ pub enum Language {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub enum ThemeMode {
+    System,
+    Light,
+    Dark,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct UserSettings {
     pub temp_unit: TempUnit,
     pub wind_unit: WindUnit,
     pub language: Language,
+    pub theme: ThemeMode,
     pub default_city: String,
     pub first_time: bool,
 }
@@ -79,6 +88,7 @@ impl Default for UserSettings {
             temp_unit: TempUnit::Celsius,
             wind_unit: WindUnit::Mps,
             language: Language::English,
+            theme: ThemeMode::System,
             default_city: "Simferopol".to_string(),
             first_time: true,
         }
@@ -91,6 +101,64 @@ fn get_settings() -> UserSettings {
 
 fn save_settings(settings: &UserSettings) {
     let _ = LocalStorage::set(SETTINGS_KEY, settings);
+}
+
+fn cycle_theme(theme: &ThemeMode) -> ThemeMode {
+    match theme {
+        ThemeMode::System => ThemeMode::Light,
+        ThemeMode::Light => ThemeMode::Dark,
+        ThemeMode::Dark => ThemeMode::System,
+    }
+}
+
+fn choice_btn_class(active: bool) -> &'static str {
+    if active {
+        "choice-btn active"
+    } else {
+        "choice-btn"
+    }
+}
+
+fn theme_icon(theme: &ThemeMode) -> &'static str {
+    match theme {
+        ThemeMode::System => "🌓",
+        ThemeMode::Light => "☀️",
+        ThemeMode::Dark => "🌙",
+    }
+}
+
+fn language_value(lang: &Language) -> &'static str {
+    match lang {
+        Language::English => "English",
+        Language::Russian => "Russian",
+    }
+}
+
+fn temp_unit_value(unit: &TempUnit) -> &'static str {
+    match unit {
+        TempUnit::Celsius => "Celsius",
+        TempUnit::Fahrenheit => "Fahrenheit",
+        TempUnit::Kelvin => "Kelvin",
+    }
+}
+
+fn wind_unit_value(unit: &WindUnit) -> &'static str {
+    match unit {
+        WindUnit::Mps => "m/s",
+        WindUnit::Kmph => "km/h",
+        WindUnit::Mph => "mph",
+    }
+}
+
+fn theme_label(theme: &ThemeMode, lang: &Language) -> &'static str {
+    match (theme, lang) {
+        (ThemeMode::System, Language::English) => "Auto",
+        (ThemeMode::Light, Language::English) => "Light",
+        (ThemeMode::Dark, Language::English) => "Dark",
+        (ThemeMode::System, Language::Russian) => "Авто",
+        (ThemeMode::Light, Language::Russian) => "Светлая",
+        (ThemeMode::Dark, Language::Russian) => "Тёмная",
+    }
 }
 
 // ---------- Helpers ----------
@@ -143,20 +211,80 @@ fn condition_icon_from_text(condition: &str) -> &'static str {
     }
 }
 
+fn moon_emoji_from_phase(phase: &str) -> &'static str {
+    let p = phase.to_lowercase();
+
+    if p.contains("new moon") {
+        "🌑"
+    } else if p.contains("waxing crescent") {
+        "🌒"
+    } else if p.contains("first quarter") {
+        "🌓"
+    } else if p.contains("waxing gibbous") {
+        "🌔"
+    } else if p.contains("full moon") {
+        "🌕"
+    } else if p.contains("waning gibbous") {
+        "🌖"
+    } else if p.contains("last quarter") || p.contains("third quarter") {
+        "🌗"
+    } else if p.contains("waning crescent") {
+        "🌘"
+    } else {
+        "🌙"
+    }
+}
+
+fn translate_moon_phase(phase: &str, lang: &Language) -> String {
+    if *lang == Language::English {
+        return phase.to_string();
+    }
+
+    match phase {
+        "New Moon" => "Новолуние".to_string(),
+        "Waxing Crescent" => "Растущий серп".to_string(),
+        "First Quarter" => "Первая четверть".to_string(),
+        "Waxing Gibbous" => "Растущая луна".to_string(),
+        "Full Moon" => "Полнолуние".to_string(),
+        "Waning Gibbous" => "Убывающая луна".to_string(),
+        "Last Quarter" => "Последняя четверть".to_string(),
+        "Waning Crescent" => "Убывающий серп".to_string(),
+        _ => phase.to_string(),
+    }
+}
+
 fn month_name_en(month: u32) -> &'static str {
     match month {
-        1 => "January", 2 => "February", 3 => "March", 4 => "April",
-        5 => "May", 6 => "June", 7 => "July", 8 => "August",
-        9 => "September", 10 => "October", 11 => "November", 12 => "December",
+        1 => "January",
+        2 => "February",
+        3 => "March",
+        4 => "April",
+        5 => "May",
+        6 => "June",
+        7 => "July",
+        8 => "August",
+        9 => "September",
+        10 => "October",
+        11 => "November",
+        12 => "December",
         _ => "Month",
     }
 }
 
 fn month_name_ru(month: u32) -> &'static str {
     match month {
-        1 => "января", 2 => "февраля", 3 => "марта", 4 => "апреля",
-        5 => "мая", 6 => "июня", 7 => "июля", 8 => "августа",
-        9 => "сентября", 10 => "октября", 11 => "ноября", 12 => "декабря",
+        1 => "января",
+        2 => "февраля",
+        3 => "марта",
+        4 => "апреля",
+        5 => "мая",
+        6 => "июня",
+        7 => "июля",
+        8 => "августа",
+        9 => "сентября",
+        10 => "октября",
+        11 => "ноября",
+        12 => "декабря",
         _ => "",
     }
 }
@@ -165,7 +293,7 @@ fn translate_condition(condition_en: &str, lang: &Language) -> String {
     if *lang == Language::English {
         return condition_en.to_string();
     }
-    // Match against the English strings returned by backend
+
     match condition_en {
         "Clear sky" => "Ясно".to_string(),
         "Mainly clear" => "Преимущественно ясно".to_string(),
@@ -195,7 +323,7 @@ fn translate_condition(condition_en: &str, lang: &Language) -> String {
         "Thunderstorm" => "Гроза".to_string(),
         "Thunderstorm with slight hail" => "Гроза с небольшим градом".to_string(),
         "Thunderstorm with heavy hail" => "Гроза с сильным градом".to_string(),
-        _ => condition_en.to_string(), // fallback to English
+        _ => condition_en.to_string(),
     }
 }
 
@@ -259,39 +387,32 @@ async fn fetch_weather(
     wind_unit: WindUnit,
 ) -> Result<WeatherResponse, String> {
     let url = format!("{}/{}", API_URL, urlencoding::encode(city));
-    
-    log::info!("Fetching weather from: {}", url);
-    
+
     let resp = Request::get(&url)
         .send()
         .await
-        .map_err(|e| {
-            log::error!("Network error: {:?}", e);
-            format!("Network error: {e}")
-        })?;
-
-    log::info!("Response status: {}", resp.status());
+        .map_err(|e| format!("Network error: {e}"))?;
 
     if !resp.ok() {
         let status = resp.status();
         let text = resp.text().await.unwrap_or_default();
-        log::error!("API error {}: {}", status, text);
-        return Err(format!("API error: {}", status));
+        return Err(format!("API error {}: {}", status, text));
     }
 
-    let text = resp.text().await.map_err(|e| format!("Failed to get text: {e}"))?;
-    
-    log::info!("Response body (first 200 chars): {}", &text[..text.len().min(200)]);
+    let text = resp
+        .text()
+        .await
+        .map_err(|e| format!("Failed to get text: {e}"))?;
 
-    let mut data: WeatherResponse = serde_json::from_str(&text)
-        .map_err(|e| {
-            log::error!("Parse error: {:?}", e);
-            format!("Failed to parse weather data: {e}")
-        })?;
+    let mut data: WeatherResponse =
+        serde_json::from_str(&text).map_err(|e| format!("Failed to parse weather data: {e}"))?;
 
-    // Convert units
     data.current.temperature = convert_temp(data.current.temperature, &temp_unit);
     data.current.wind_speed = convert_wind(data.current.wind_speed, &wind_unit);
+
+    data.yesterday.temperature_max = convert_temp(data.yesterday.temperature_max, &temp_unit);
+    data.yesterday.temperature_min = convert_temp(data.yesterday.temperature_min, &temp_unit);
+    data.yesterday.wind_speed_max = convert_wind(data.yesterday.wind_speed_max, &wind_unit);
 
     for f in &mut data.forecast {
         f.temperature_max = convert_temp(f.temperature_max, &temp_unit);
@@ -302,7 +423,7 @@ async fn fetch_weather(
     Ok(data)
 }
 
-// ---------- Download Menu (unchanged but fixed open_link) ----------
+// ---------- Download Menu ----------
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum DownloadOs {
     Android,
@@ -315,11 +436,11 @@ fn download_label(os: DownloadOs, lang: &Language) -> &'static str {
     match (os, lang) {
         (DownloadOs::Android, Language::English) => "Android",
         (DownloadOs::Windows, Language::English) => "Windows",
-        (DownloadOs::MacOS, Language::English) => "MacOS",
+        (DownloadOs::MacOS, Language::English) => "macOS",
         (DownloadOs::Linux, Language::English) => "Linux",
         (DownloadOs::Android, Language::Russian) => "Android",
         (DownloadOs::Windows, Language::Russian) => "Windows",
-        (DownloadOs::MacOS, Language::Russian) => "MacOS",
+        (DownloadOs::MacOS, Language::Russian) => "macOS",
         (DownloadOs::Linux, Language::Russian) => "Linux",
     }
 }
@@ -451,17 +572,17 @@ fn SettingsModal(
                             "Язык:"
                         }
                     }
-                    select {
-                        value: format!("{:?}", temp_settings().language),
-                        onchange: move |e| {
-                            let new_lang = match e.value().as_str() {
-                                "Russian" => Language::Russian,
-                                _ => Language::English,
-                            };
-                            temp_settings.write().language = new_lang;
-                        },
-                        option { value: "English", "English" }
-                        option { value: "Russian", "Русский" }
+                    div { class: "choice-group",
+                        button {
+                            class: choice_btn_class(temp_settings().language == Language::English),
+                            onclick: move |_| temp_settings.write().language = Language::English,
+                            "English"
+                        }
+                        button {
+                            class: choice_btn_class(temp_settings().language == Language::Russian),
+                            onclick: move |_| temp_settings.write().language = Language::Russian,
+                            "Русский"
+                        }
                     }
                 }
 
@@ -473,19 +594,34 @@ fn SettingsModal(
                             "Единица температуры:"
                         }
                     }
-                    select {
-                        value: format!("{:?}", temp_settings().temp_unit),
-                        onchange: move |e| {
-                            let unit = match e.value().as_str() {
-                                "Fahrenheit" => TempUnit::Fahrenheit,
-                                "Kelvin" => TempUnit::Kelvin,
-                                _ => TempUnit::Celsius,
-                            };
-                            temp_settings.write().temp_unit = unit;
-                        },
-                        option { value: "Celsius", if lang == Language::English { "Celsius (°C)" } else { "Цельсий (°C)" } }
-                        option { value: "Fahrenheit", if lang == Language::English { "Fahrenheit (°F)" } else { "Фаренгейт (°F)" } }
-                        option { value: "Kelvin", if lang == Language::English { "Kelvin (K)" } else { "Кельвин (K)" } }
+                    div { class: "choice-group",
+                        button {
+                            class: choice_btn_class(temp_settings().temp_unit == TempUnit::Celsius),
+                            onclick: move |_| temp_settings.write().temp_unit = TempUnit::Celsius,
+                            if lang == Language::English {
+                                "Celsius (°C)"
+                            } else {
+                                "Цельсий (°C)"
+                            }
+                        }
+                        button {
+                            class: choice_btn_class(temp_settings().temp_unit == TempUnit::Fahrenheit),
+                            onclick: move |_| temp_settings.write().temp_unit = TempUnit::Fahrenheit,
+                            if lang == Language::English {
+                                "Fahrenheit (°F)"
+                            } else {
+                                "Фаренгейт (°F)"
+                            }
+                        }
+                        button {
+                            class: choice_btn_class(temp_settings().temp_unit == TempUnit::Kelvin),
+                            onclick: move |_| temp_settings.write().temp_unit = TempUnit::Kelvin,
+                            if lang == Language::English {
+                                "Kelvin (K)"
+                            } else {
+                                "Кельвин (K)"
+                            }
+                        }
                     }
                 }
 
@@ -497,19 +633,73 @@ fn SettingsModal(
                             "Единица ветра:"
                         }
                     }
-                    select {
-                        value: format!("{:?}", temp_settings().wind_unit),
-                        onchange: move |e| {
-                            let unit = match e.value().as_str() {
-                                "km/h" => WindUnit::Kmph,
-                                "mph" => WindUnit::Mph,
-                                _ => WindUnit::Mps,
-                            };
-                            temp_settings.write().wind_unit = unit;
-                        },
-                       option { value: "m/s", if lang == Language::English { "m/s" } else { "м/с" } }
-                        option { value: "km/h", if lang == Language::English { "km/h" } else { "км/ч" } }
-                        option { value: "mph", if lang == Language::English { "mph" } else { "миль/ч" } }
+                    div { class: "choice-group",
+                        button {
+                            class: choice_btn_class(temp_settings().wind_unit == WindUnit::Mps),
+                            onclick: move |_| temp_settings.write().wind_unit = WindUnit::Mps,
+                            if lang == Language::English {
+                                "m/s"
+                            } else {
+                                "м/с"
+                            }
+                        }
+                        button {
+                            class: choice_btn_class(temp_settings().wind_unit == WindUnit::Kmph),
+                            onclick: move |_| temp_settings.write().wind_unit = WindUnit::Kmph,
+                            if lang == Language::English {
+                                "km/h"
+                            } else {
+                                "км/ч"
+                            }
+                        }
+                        button {
+                            class: choice_btn_class(temp_settings().wind_unit == WindUnit::Mph),
+                            onclick: move |_| temp_settings.write().wind_unit = WindUnit::Mph,
+                            if lang == Language::English {
+                                "mph"
+                            } else {
+                                "миль/ч"
+                            }
+                        }
+                    }
+                }
+
+                div { class: "setting-row",
+                    label {
+                        if lang == Language::English {
+                            "Theme:"
+                        } else {
+                            "Тема:"
+                        }
+                    }
+                    div { class: "choice-group",
+                        button {
+                            class: choice_btn_class(temp_settings().theme == ThemeMode::System),
+                            onclick: move |_| temp_settings.write().theme = ThemeMode::System,
+                            if lang == Language::English {
+                                "Auto"
+                            } else {
+                                "Авто"
+                            }
+                        }
+                        button {
+                            class: choice_btn_class(temp_settings().theme == ThemeMode::Light),
+                            onclick: move |_| temp_settings.write().theme = ThemeMode::Light,
+                            if lang == Language::English {
+                                "Light"
+                            } else {
+                                "Светлая"
+                            }
+                        }
+                        button {
+                            class: choice_btn_class(temp_settings().theme == ThemeMode::Dark),
+                            onclick: move |_| temp_settings.write().theme = ThemeMode::Dark,
+                            if lang == Language::English {
+                                "Dark"
+                            } else {
+                                "Тёмная"
+                            }
+                        }
                     }
                 }
 
@@ -589,16 +779,17 @@ fn WelcomeModal(on_complete: EventHandler<UserSettings>) -> Element {
                             "Язык:"
                         }
                     }
-                    select {
-                        onchange: move |e| {
-                            let new_lang = match e.value().as_str() {
-                                "Russian" => Language::Russian,
-                                _ => Language::English,
-                            };
-                            temp_settings.write().language = new_lang;
-                        },
-                        option { value: "English", "English" }
-                        option { value: "Russian", "Русский" }
+                    div { class: "choice-group",
+                        button {
+                            class: choice_btn_class(temp_settings().language == Language::English),
+                            onclick: move |_| temp_settings.write().language = Language::English,
+                            "English"
+                        }
+                        button {
+                            class: choice_btn_class(temp_settings().language == Language::Russian),
+                            onclick: move |_| temp_settings.write().language = Language::Russian,
+                            "Русский"
+                        }
                     }
                 }
 
@@ -610,18 +801,34 @@ fn WelcomeModal(on_complete: EventHandler<UserSettings>) -> Element {
                             "Единица температуры:"
                         }
                     }
-                    select {
-                        onchange: move |e| {
-                            let unit = match e.value().as_str() {
-                                "Fahrenheit" => TempUnit::Fahrenheit,
-                                "Kelvin" => TempUnit::Kelvin,
-                                _ => TempUnit::Celsius,
-                            };
-                            temp_settings.write().temp_unit = unit;
-                        },
-                        option { value: "Celsius", if lang == Language::English { "Celsius (°C)" } else { "Цельсий (°C)" } }
-                        option { value: "Fahrenheit", if lang == Language::English { "Fahrenheit (°F)" } else { "Фаренгейт (°F)" } }
-                        option { value: "Kelvin", if lang == Language::English { "Kelvin (K)" } else { "Кельвин (K)" } }
+                    div { class: "choice-group",
+                        button {
+                            class: choice_btn_class(temp_settings().temp_unit == TempUnit::Celsius),
+                            onclick: move |_| temp_settings.write().temp_unit = TempUnit::Celsius,
+                            if lang == Language::English {
+                                "Celsius (°C)"
+                            } else {
+                                "Цельсий (°C)"
+                            }
+                        }
+                        button {
+                            class: choice_btn_class(temp_settings().temp_unit == TempUnit::Fahrenheit),
+                            onclick: move |_| temp_settings.write().temp_unit = TempUnit::Fahrenheit,
+                            if lang == Language::English {
+                                "Fahrenheit (°F)"
+                            } else {
+                                "Фаренгейт (°F)"
+                            }
+                        }
+                        button {
+                            class: choice_btn_class(temp_settings().temp_unit == TempUnit::Kelvin),
+                            onclick: move |_| temp_settings.write().temp_unit = TempUnit::Kelvin,
+                            if lang == Language::English {
+                                "Kelvin (K)"
+                            } else {
+                                "Кельвин (K)"
+                            }
+                        }
                     }
                 }
 
@@ -633,18 +840,73 @@ fn WelcomeModal(on_complete: EventHandler<UserSettings>) -> Element {
                             "Единица ветра:"
                         }
                     }
-                    select {
-                        onchange: move |e| {
-                            let unit = match e.value().as_str() {
-                                "km/h" => WindUnit::Kmph,
-                                "mph" => WindUnit::Mph,
-                                _ => WindUnit::Mps,
-                            };
-                            temp_settings.write().wind_unit = unit;
-                        },
-                        option { value: "m/s", if lang == Language::English { "m/s" } else { "м/с" } }
-                        option { value: "km/h", if lang == Language::English { "km/h" } else { "км/ч" } }
-                        option { value: "mph", if lang == Language::English { "mph" } else { "миль/ч" } }
+                    div { class: "choice-group",
+                        button {
+                            class: choice_btn_class(temp_settings().wind_unit == WindUnit::Mps),
+                            onclick: move |_| temp_settings.write().wind_unit = WindUnit::Mps,
+                            if lang == Language::English {
+                                "m/s"
+                            } else {
+                                "м/с"
+                            }
+                        }
+                        button {
+                            class: choice_btn_class(temp_settings().wind_unit == WindUnit::Kmph),
+                            onclick: move |_| temp_settings.write().wind_unit = WindUnit::Kmph,
+                            if lang == Language::English {
+                                "km/h"
+                            } else {
+                                "км/ч"
+                            }
+                        }
+                        button {
+                            class: choice_btn_class(temp_settings().wind_unit == WindUnit::Mph),
+                            onclick: move |_| temp_settings.write().wind_unit = WindUnit::Mph,
+                            if lang == Language::English {
+                                "mph"
+                            } else {
+                                "миль/ч"
+                            }
+                        }
+                    }
+                }
+
+                div { class: "setting-row",
+                    label {
+                        if lang == Language::English {
+                            "Theme:"
+                        } else {
+                            "Тема:"
+                        }
+                    }
+                    div { class: "choice-group",
+                        button {
+                            class: choice_btn_class(temp_settings().theme == ThemeMode::System),
+                            onclick: move |_| temp_settings.write().theme = ThemeMode::System,
+                            if lang == Language::English {
+                                "Auto"
+                            } else {
+                                "Авто"
+                            }
+                        }
+                        button {
+                            class: choice_btn_class(temp_settings().theme == ThemeMode::Light),
+                            onclick: move |_| temp_settings.write().theme = ThemeMode::Light,
+                            if lang == Language::English {
+                                "Light"
+                            } else {
+                                "Светлая"
+                            }
+                        }
+                        button {
+                            class: choice_btn_class(temp_settings().theme == ThemeMode::Dark),
+                            onclick: move |_| temp_settings.write().theme = ThemeMode::Dark,
+                            if lang == Language::English {
+                                "Dark"
+                            } else {
+                                "Тёмная"
+                            }
+                        }
                     }
                 }
 
@@ -723,7 +985,7 @@ fn SearchBar(on_search: EventHandler<String>) -> Element {
     }
 }
 
-// ---------- Weather Display (Simplified) ----------
+// ---------- Weather Display ----------
 #[component]
 fn WeatherDisplay(
     data: WeatherResponse,
@@ -738,16 +1000,28 @@ fn WeatherDisplay(
     };
 
     let wind_unit_str = match wind_unit {
-    WindUnit::Mps => {
-        if lang == Language::English { "m/s" } else { "м/с" }
-    }
-    WindUnit::Kmph => {
-        if lang == Language::English { "km/h" } else { "км/ч" }
-    }
-    WindUnit::Mph => {
-        if lang == Language::English { "mph" } else { "миль/ч" }
-    }
-};
+        WindUnit::Mps => {
+            if lang == Language::English {
+                "m/s"
+            } else {
+                "м/с"
+            }
+        }
+        WindUnit::Kmph => {
+            if lang == Language::English {
+                "km/h"
+            } else {
+                "км/ч"
+            }
+        }
+        WindUnit::Mph => {
+            if lang == Language::English {
+                "mph"
+            } else {
+                "миль/ч"
+            }
+        }
+    };
 
     let condition_icon_str = condition_icon_from_text(&data.current.condition);
 
@@ -764,7 +1038,9 @@ fn WeatherDisplay(
 
                 div { class: "condition-line",
                     span { class: "condition-icon", "{condition_icon_str}" }
-                    span { class: "condition-text", "{translate_condition(&data.current.condition, &lang)}" }
+                    span { class: "condition-text",
+                        "{translate_condition(&data.current.condition, &lang)}"
+                    }
                 }
 
                 div { class: "weather-details",
@@ -812,7 +1088,7 @@ fn WeatherDisplay(
                                                 "{} {:.1} {}",
                                                 if lang == Language::English { "wind:" } else { "ветер:" },
                                                 f.wind_speed_max,
-                                                wind_unit_str
+                                                wind_unit_str,
                                             )
                                         }
                                     }
@@ -823,41 +1099,70 @@ fn WeatherDisplay(
                 }
             }
 
-            // Show sunrise/sunset from first forecast day
             if let Some(first_day) = data.forecast.first() {
-                div { class: "astronomy-section glass-card",
-                    h3 {
-                        if lang == Language::English {
-                            "Sun & Moon"
-                        } else {
-                            "Солнце и Луна"
-                        }
-                    }
-                    div { class: "astronomy-grid",
-                        div { class: "astro-card",
-                            p {
-                                {
-                                    format!(
-                                        "🌅 {}: {}",
-                                        if lang == Language::English { "Sunrise" } else { "Восход" },
-                                        first_day.sunrise.as_deref().map(format_time).unwrap_or("N/A".to_string()),
-                                    )
+                {
+                    let moon_phase = first_day
+                        .moon_phase_name
+                        .clone()
+                        .unwrap_or_else(|| "Unknown".to_string());
+
+                    let moon_emoji = moon_emoji_from_phase(&moon_phase);
+
+                    let moon_percent = first_day
+                        .moon_illumination
+                        .map(|v| format!("{:.0}%", v))
+                        .unwrap_or_else(|| "N/A".to_string());
+
+                    rsx! {
+                        div { class: "astronomy-section glass-card",
+                            h3 {
+                                if lang == Language::English {
+                                    "Sun & Moon"
+                                } else {
+                                    "Солнце и Луна"
                                 }
                             }
-                            p {
-                                {
-                                    format!(
-                                        "🌇 {}: {}",
-                                        if lang == Language::English { "Sunset" } else { "Закат" },
-                                        first_day.sunset.as_deref().map(format_time).unwrap_or("N/A".to_string()),
-                                    )
+
+
+
+
+
+
+
+                            div { class: "astronomy-grid",
+                                div { class: "astro-card",
+                                    p {
+                                        {
+                                            format!(
+                                                "🌅 {}: {}",
+                                                if lang == Language::English { "Sunrise" } else { "Восход" },
+                                                first_day.sunrise.as_deref().map(format_time).unwrap_or("N/A".to_string()),
+                                            )
+                                        }
+                                    }
+                                    p {
+                                        {
+                                            format!(
+                                                "🌇 {}: {}",
+                                                if lang == Language::English { "Sunset" } else { "Закат" },
+                                                first_day.sunset.as_deref().map(format_time).unwrap_or("N/A".to_string()),
+                                            )
+                                        }
+                                    }
                                 }
-                            }
-                        }
-                        div { class: "astro-card",
-                            p {
-                                {
-                                    first_day.moon_phase.as_deref().unwrap_or("N/A")
+
+                                div { class: "astro-card",
+                                    p { "{moon_emoji}" }
+                                    p { "{translate_moon_phase(&moon_phase, &lang)}" }
+                                    p {
+                                        {
+                                            if lang == Language::English {
+                                                format!("Illumination: {}", moon_percent)
+                                            } else {
+                                                format!("Освещённость: {}", moon_percent)
+                                            }
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -868,14 +1173,14 @@ fn WeatherDisplay(
     }
 }
 
-// ---------- Main App ----------
+// ---------- Main ----------
 fn main() {
     #[cfg(target_arch = "wasm32")]
     {
         std::panic::set_hook(Box::new(console_error_panic_hook::hook));
         console_log::init_with_level(log::Level::Debug).expect("error initializing logger");
-        log::info!("App starting...");
     }
+
     dioxus::launch(App);
 }
 
@@ -891,30 +1196,32 @@ fn App() -> Element {
     let mut initial_fetch_done = use_signal(|| false);
 
     let lang = settings().language.clone();
+    let theme_class = match settings().theme {
+        ThemeMode::System => "theme-system",
+        ThemeMode::Light => "theme-light",
+        ThemeMode::Dark => "theme-dark",
+    };
 
-    let mut fetch_and_set = {
-        let mut weather = weather.clone();
-        let mut loading = loading.clone();
-        let mut error = error.clone();
+    let fetch_and_set = {
+        let weather = weather;
+        let loading = loading;
+        let error = error;
 
         move |city: String, temp_unit: TempUnit, wind_unit: WindUnit| {
-            log::info!("Fetching weather for: {}", city);
+            let mut weather = weather;
+            let mut loading = loading;
+            let mut error = error;
+
             loading.set(true);
             error.set(None);
-
-            let mut weather = weather.clone();
-            let mut loading = loading.clone();
-            let mut error = error.clone();
 
             spawn(async move {
                 match fetch_weather(&city, temp_unit, wind_unit).await {
                     Ok(data) => {
-                        log::info!("Weather fetched successfully!");
                         weather.set(Some(data));
                         error.set(None);
                     }
                     Err(msg) => {
-                        log::error!("Fetch failed: {}", msg);
                         weather.set(None);
                         error.set(Some(msg));
                     }
@@ -942,7 +1249,7 @@ fn App() -> Element {
         document::Link { rel: "stylesheet", href: CSS }
         document::Link { rel: "icon", href: FAVICON }
 
-        div { class: "app-shell",
+        div { class: format!("app-shell {}", theme_class),
             div { class: "app-container",
                 div { class: "header glass-card",
                     div { class: "brand",
@@ -951,6 +1258,20 @@ fn App() -> Element {
                     }
 
                     div { class: "header-buttons",
+                        button {
+                            class: "icon-btn",
+                            onclick: move |_| {
+                                let mut new_settings = settings();
+                                new_settings.theme = cycle_theme(&new_settings.theme);
+                                save_settings(&new_settings);
+                                settings.set(new_settings);
+                            },
+                            match &settings().theme {
+                                ThemeMode::System => "🌓",
+                                ThemeMode::Light => "☀️",
+                                ThemeMode::Dark => "🌙",
+                            }
+                        }
                         button {
                             class: "icon-btn",
                             onclick: move |_| show_downloads.set(true),

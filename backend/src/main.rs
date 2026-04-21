@@ -1,16 +1,13 @@
-use axum::{
-    extract::Path,
-    response::IntoResponse,
-    routing::get,
-    Json, Router,
-};
-use chrono::{Duration, Local};
-use reqwest::StatusCode;
+use axum::{Json, Router, extract::Path, http::StatusCode, response::IntoResponse, routing::get};
+use chrono::{Datelike, Duration, Local, NaiveDate};
 use serde::{Deserialize, Serialize};
-use tower_http::cors::{CorsLayer, Any};
+use std::{collections::HashMap, f64::consts::PI};
+use tower_http::cors::{Any, CorsLayer};
 
 const PORT: u16 = 3000;
+const MOON_API_KEY: &str = "YOUR_API_KEY_HERE";
 
+// ---------- Geocoding ----------
 #[derive(Debug, Deserialize)]
 struct GeocodingResponse {
     results: Vec<GeocodingResult>,
@@ -22,6 +19,7 @@ struct GeocodingResult {
     longitude: f64,
 }
 
+// ---------- Open-Meteo Forecast ----------
 #[derive(Debug, Deserialize)]
 struct OpenMeteoForecast {
     current: CurrentWeather,
@@ -60,6 +58,26 @@ struct ArchiveDaily {
     weather_code: Vec<u8>,
 }
 
+// ---------- FreeAstro Moon Month ----------
+#[derive(Debug, Deserialize)]
+struct MoonMonthResponse {
+    days: Vec<MoonDay>,
+}
+
+#[derive(Debug, Deserialize)]
+struct MoonDay {
+    calendar_date: String,
+    phase: MoonPhaseInfo,
+}
+
+#[derive(Debug, Deserialize)]
+struct MoonPhaseInfo {
+    name: String,
+    illumination: f64,
+    is_waxing: Option<bool>,
+}
+
+// ---------- Unified Response ----------
 #[derive(Debug, Serialize)]
 struct WeatherResponse {
     city: String,
@@ -84,9 +102,11 @@ struct DailyData {
     condition: String,
     sunrise: Option<String>,
     sunset: Option<String>,
-    moon_phase: Option<String>,
+    moon_phase_name: Option<String>,
+    moon_illumination: Option<f64>,
 }
 
+// ---------- Weather Code Descriptions ----------
 fn weather_description(code: u8) -> &'static str {
     match code {
         0 => "Clear sky",
@@ -121,6 +141,102 @@ fn weather_description(code: u8) -> &'static str {
     }
 }
 
+// ---------- Moon helpers ----------
+fn normalize_illumination(value: f64) -> f64 {
+    if value <= 1.5 { value * 100.0 } else { value }
+}
+
+fn moon_phase_for_date(date: NaiveDate) -> (String, f64) {
+    const SYNODIC_MONTH: f64 = 29.530_588_67;
+
+    let reference_new_moon = NaiveDate::from_ymd_opt(2000, 1, 6).unwrap();
+    let days_since_reference = (date - reference_new_moon).num_days() as f64;
+
+    let mut age = days_since_reference % SYNODIC_MONTH;
+    if age < 0.0 {
+        age += SYNODIC_MONTH;
+    }
+
+    let illumination = ((1.0 - (2.0 * PI * age / SYNODIC_MONTH).cos()) / 2.0) * 100.0;
+
+    let phase_name = match age {
+        a if a < 1.84566 => "New Moon",
+        a if a < 5.53699 => "Waxing Crescent",
+        a if a < 9.22831 => "First Quarter",
+        a if a < 12.91963 => "Waxing Gibbous",
+        a if a < 16.61096 => "Full Moon",
+        a if a < 20.30228 => "Waning Gibbous",
+        a if a < 23.99361 => "Last Quarter",
+        a if a < 27.68493 => "Waning Crescent",
+        _ => "New Moon",
+    };
+
+    (phase_name.to_string(), illumination.clamp(0.0, 100.0))
+}
+
+async fn fetch_moon_month(
+    lat: f64,
+    lon: f64,
+    year: i32,
+    month: u32,
+) -> Result<MoonMonthResponse, String> {
+    let url = format!(
+        "https://api.freeastroapi.com/api/v1/moon/month?year={}&month={}&lat={:.4}&lon={:.4}&include_zodiac=true&include_traditional_moon=true&include_sign_timeline=true",
+        year, month, lat, lon
+    );
+
+    let client = reqwest::Client::new();
+    let response = client
+        .get(&url)
+        .header("x-api-key", MOON_API_KEY)
+        .send()
+        .await
+        .map_err(|e| format!("Moon API request failed: {}", e))?;
+
+    if !response.status().is_success() {
+        let status = response.status();
+        let body = response.text().await.unwrap_or_default();
+        return Err(format!("Moon API error {}: {}", status, body));
+    }
+
+    response
+        .json::<MoonMonthResponse>()
+        .await
+        .map_err(|e| format!("Failed to parse moon JSON: {}", e))
+}
+
+async fn moon_for_date(
+    lat: f64,
+    lon: f64,
+    date: &str,
+    moon_cache: &mut HashMap<(i32, u32), MoonMonthResponse>,
+) -> (String, f64) {
+    let parsed = match NaiveDate::parse_from_str(date, "%Y-%m-%d") {
+        Ok(d) => d,
+        Err(_) => return moon_phase_for_date(Local::now().date_naive()),
+    };
+
+    let key = (parsed.year(), parsed.month());
+
+    if !moon_cache.contains_key(&key) {
+        if let Ok(month_data) = fetch_moon_month(lat, lon, key.0, key.1).await {
+            moon_cache.insert(key, month_data);
+        }
+    }
+
+    if let Some(month_data) = moon_cache.get(&key) {
+        if let Some(day) = month_data.days.iter().find(|d| d.calendar_date == date) {
+            return (
+                day.phase.name.clone(),
+                normalize_illumination(day.phase.illumination),
+            );
+        }
+    }
+
+    moon_phase_for_date(parsed)
+}
+
+// ---------- Geocoding ----------
 async fn get_coordinates(city: &str) -> Result<(f64, f64), String> {
     let encoded = urlencoding::encode(city);
     let url = format!(
@@ -149,6 +265,7 @@ async fn get_coordinates(city: &str) -> Result<(f64, f64), String> {
     Ok((first.latitude, first.longitude))
 }
 
+// ---------- Forecast ----------
 async fn fetch_forecast(lat: f64, lon: f64) -> Result<OpenMeteoForecast, String> {
     let url = format!(
         "https://api.open-meteo.com/v1/forecast?latitude={:.4}&longitude={:.4}&current=temperature_2m,wind_speed_10m,weather_code&daily=temperature_2m_max,temperature_2m_min,wind_speed_10m_max,weather_code,sunrise,sunset&timezone=auto",
@@ -169,8 +286,14 @@ async fn fetch_forecast(lat: f64, lon: f64) -> Result<OpenMeteoForecast, String>
         .map_err(|e| format!("Failed to parse forecast JSON: {}", e))
 }
 
-async fn fetch_yesterday(lat: f64, lon: f64) -> Result<DailyData, String> {
-    let yesterday = (Local::now() - Duration::days(1)).format("%Y-%m-%d").to_string();
+// ---------- Yesterday's Weather ----------
+async fn fetch_yesterday(
+    lat: f64,
+    lon: f64,
+    moon_cache: &mut HashMap<(i32, u32), MoonMonthResponse>,
+) -> Result<DailyData, String> {
+    let yesterday_date = (Local::now() - Duration::days(1)).date_naive();
+    let yesterday = yesterday_date.format("%Y-%m-%d").to_string();
 
     let url = format!(
         "https://archive-api.open-meteo.com/v1/archive?latitude={:.4}&longitude={:.4}&start_date={}&end_date={}&daily=temperature_2m_max,temperature_2m_min,wind_speed_10m_max,weather_code&timezone=auto",
@@ -194,6 +317,9 @@ async fn fetch_yesterday(lat: f64, lon: f64) -> Result<DailyData, String> {
         return Err("No historical data available".to_string());
     }
 
+    let (moon_phase_name, moon_illumination) =
+        moon_for_date(lat, lon, &yesterday, moon_cache).await;
+
     Ok(DailyData {
         date: data.daily.time[0].clone(),
         temperature_max: data.daily.temperature_2m_max[0],
@@ -202,25 +328,31 @@ async fn fetch_yesterday(lat: f64, lon: f64) -> Result<DailyData, String> {
         condition: weather_description(data.daily.weather_code[0]).to_string(),
         sunrise: None,
         sunset: None,
-        moon_phase: None,
+        moon_phase_name: Some(moon_phase_name),
+        moon_illumination: Some(moon_illumination),
     })
 }
 
+// ---------- Main Handler ----------
 async fn get_weather(Path(city): Path<String>) -> impl IntoResponse {
     let (lat, lon) = match get_coordinates(&city).await {
         Ok(coords) => coords,
         Err(e) => return (StatusCode::BAD_REQUEST, e).into_response(),
     };
 
-    let (forecast_result, yesterday_result) =
-        tokio::join!(fetch_forecast(lat, lon), fetch_yesterday(lat, lon));
+    let (forecast_result, moon_cache_seed) = (
+        fetch_forecast(lat, lon),
+        HashMap::<(i32, u32), MoonMonthResponse>::new(),
+    );
 
-    let forecast = match forecast_result {
+    let forecast = match forecast_result.await {
         Ok(f) => f,
         Err(e) => return (StatusCode::INTERNAL_SERVER_ERROR, e).into_response(),
     };
 
-    let yesterday = match yesterday_result {
+    let mut moon_cache = moon_cache_seed;
+
+    let yesterday = match fetch_yesterday(lat, lon, &mut moon_cache).await {
         Ok(y) => y,
         Err(e) => return (StatusCode::INTERNAL_SERVER_ERROR, e).into_response(),
     };
@@ -232,21 +364,24 @@ async fn get_weather(Path(city): Path<String>) -> impl IntoResponse {
     };
 
     let daily = &forecast.daily;
-    let forecast_days: Vec<DailyData> = daily
-        .time
-        .iter()
-        .enumerate()
-        .map(|(i, date)| DailyData {
+    let mut forecast_days: Vec<DailyData> = Vec::with_capacity(daily.time.len());
+
+    for (i, date) in daily.time.iter().enumerate() {
+        let (moon_phase_name, moon_illumination) =
+            moon_for_date(lat, lon, date, &mut moon_cache).await;
+
+        forecast_days.push(DailyData {
             date: date.clone(),
             temperature_max: daily.temperature_2m_max[i],
             temperature_min: daily.temperature_2m_min[i],
             wind_speed_max: daily.wind_speed_10m_max[i],
             condition: weather_description(daily.weather_code[i]).to_string(),
-            sunrise: Some(daily.sunrise[i].clone()),
-            sunset: Some(daily.sunset[i].clone()),
-            moon_phase: None,
-        })
-        .collect();
+            sunrise: daily.sunrise.get(i).cloned(),
+            sunset: daily.sunset.get(i).cloned(),
+            moon_phase_name: Some(moon_phase_name),
+            moon_illumination: Some(moon_illumination),
+        });
+    }
 
     let response = WeatherResponse {
         city,
@@ -265,7 +400,9 @@ async fn main() {
         .allow_methods(Any)
         .allow_headers(Any);
 
-    let app = Router::new().route("/get_weather/{city}", get(get_weather)).layer(cors);
+    let app = Router::new()
+        .route("/get_weather/{city}", get(get_weather))
+        .layer(cors);
 
     let listener = tokio::net::TcpListener::bind(format!("0.0.0.0:{PORT}"))
         .await
