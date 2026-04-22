@@ -136,47 +136,6 @@ fn theme_icon(theme: Theme) -> &'static str {
     }
 }
 
-fn language_value(lang: &Language) -> &'static str {
-    match lang {
-        Language::English => "English",
-        Language::Russian => "Russian",
-    }
-}
-
-fn resolve_theme(theme: Theme) -> Theme {
-    match theme {
-        Theme::Auto => Theme::Light,
-        _ => theme,
-    }
-}
-
-fn temp_unit_value(unit: &TempUnit) -> &'static str {
-    match unit {
-        TempUnit::Celsius => "Celsius",
-        TempUnit::Fahrenheit => "Fahrenheit",
-        TempUnit::Kelvin => "Kelvin",
-    }
-}
-
-fn wind_unit_value(unit: &WindUnit) -> &'static str {
-    match unit {
-        WindUnit::Mps => "m/s",
-        WindUnit::Kmph => "km/h",
-        WindUnit::Mph => "mph",
-    }
-}
-
-fn theme_label(theme: &Theme, lang: &Language) -> &'static str {
-    match (theme, lang) {
-        (Theme::Auto, Language::English) => "Auto",
-        (Theme::Light, Language::English) => "Light",
-        (Theme::Dark, Language::English) => "Dark",
-        (Theme::Auto, Language::Russian) => "Авто",
-        (Theme::Light, Language::Russian) => "Светлая",
-        (Theme::Dark, Language::Russian) => "Тёмная",
-    }
-}
-
 // ---------- Helpers ----------
 fn convert_temp(celsius: f64, unit: &TempUnit) -> f64 {
     match unit {
@@ -452,25 +411,25 @@ fn download_label(os: DownloadOs, lang: &Language) -> &'static str {
     match (os, lang) {
         (DownloadOs::Android, Language::English) => "Android",
         (DownloadOs::Windows, Language::English) => "Windows",
-        (DownloadOs::MacOS, Language::English) => "macOS",
+        (DownloadOs::MacOS, Language::English) => "MacOS",
         (DownloadOs::Linux, Language::English) => "Linux",
         (DownloadOs::Android, Language::Russian) => "Android",
         (DownloadOs::Windows, Language::Russian) => "Windows",
-        (DownloadOs::MacOS, Language::Russian) => "macOS",
+        (DownloadOs::MacOS, Language::Russian) => "MacOS",
         (DownloadOs::Linux, Language::Russian) => "Linux",
     }
 }
 
 fn download_description(os: DownloadOs, lang: &Language) -> &'static str {
     match (os, lang) {
-        (DownloadOs::Android, Language::English) => "APK for phones",
-        (DownloadOs::Windows, Language::English) => "Installer for PC",
-        (DownloadOs::MacOS, Language::English) => "macOS app",
-        (DownloadOs::Linux, Language::English) => "Linux build",
-        (DownloadOs::Android, Language::Russian) => "APK для телефона",
-        (DownloadOs::Windows, Language::Russian) => "Установщик для ПК",
-        (DownloadOs::MacOS, Language::Russian) => "Приложение для macOS",
-        (DownloadOs::Linux, Language::Russian) => "Сборка для Linux",
+        (DownloadOs::Android, Language::English) => ".apk for Android",
+        (DownloadOs::Windows, Language::English) => ".exe for PC",
+        (DownloadOs::MacOS, Language::English) => ".dmg for Mac",
+        (DownloadOs::Linux, Language::English) => ".deb for Linux",
+        (DownloadOs::Android, Language::Russian) => ".apk для Android",
+        (DownloadOs::Windows, Language::Russian) => ".exe для ПК",
+        (DownloadOs::MacOS, Language::Russian) => ".dmg для Mac",
+        (DownloadOs::Linux, Language::Russian) => ".deb для Linux",
     }
 }
 
@@ -583,7 +542,6 @@ fn SettingsModal(
                     button { class: "close-btn", onclick: handle_close, "✖" }
                 }
 
-                // All setting rows (unchanged)
                 div { class: "setting-row",
                     label {
                         if lang == Language::English {
@@ -737,8 +695,6 @@ fn SettingsModal(
                         oninput: move |e| temp_settings.write().default_city = e.value(),
                     }
                 }
-            
-            // Removed the modal-actions div entirely
             }
         }
     }
@@ -1127,105 +1083,6 @@ fn WeatherDisplay(
         
         
         
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
                             div { class: "astronomy-grid",
                                 div { class: "astro-card",
                                     p {
@@ -1247,7 +1104,6 @@ fn WeatherDisplay(
                                         }
                                     }
                                 }
-        
                                 div { class: "astro-card",
                                     p { "{moon_emoji}" }
                                     p { "{translate_moon_phase(&moon_phase, &lang)}" }
@@ -1272,24 +1128,51 @@ fn WeatherDisplay(
 
 // ---------- Main ----------
 fn main() {
-    #[cfg(target_arch = "wasm32")]
-    {
-        std::panic::set_hook(Box::new(console_error_panic_hook::hook));
-        console_log::init_with_level(log::Level::Debug).expect("error initializing logger");
-    }
-
     dioxus::launch(App);
 }
 
 #[component]
 fn App() -> Element {
     let mut settings = use_signal(get_settings);
-    // let theme = resolve_theme(settings().theme);
+    #[allow(warnings)]
+    let mut system_theme = use_signal(|| Theme::Light);
+    use_effect(move || {
+        #[cfg(target_arch = "wasm32")]
+        {
+            use gloo::events::EventListener;
+            use gloo::utils::window;
+            use wasm_bindgen::JsCast;
 
-    // let android_icon = ANDROID_ICON;
-    // let windows_icon = WINDOWS_ICON;
-    // let linux_icon = LINUX_ICON;
-    // let apple_icon = apple_icon(theme);
+            if let Ok(Some(media_query)) = window().match_media("(prefers-color-scheme: dark)") {
+                let mut update = move |matches: bool| {
+                    system_theme.set(if matches { Theme::Dark } else { Theme::Light });
+                };
+
+                update(media_query.matches());
+
+                let listener = EventListener::new(&media_query, "change", move |event| {
+                    if let Some(event) = event.dyn_ref::<web_sys::MediaQueryListEvent>() {
+                        update(event.matches());
+                    }
+                });
+
+                listener.forget();
+            }
+        }
+    });
+
+    let resolved_theme = match settings().theme {
+        Theme::Auto => system_theme(),
+        other => other,
+    };
+
+    let theme_class = match resolved_theme {
+        Theme::Light => "theme-light",
+        Theme::Dark => "theme-dark",
+        Theme::Auto => "theme-light",
+    };
+
+    // ---- Rest of your existing App code (weather, loading, error, modals, etc.) ----
     let weather = use_signal(|| None::<WeatherResponse>);
     let loading = use_signal(|| false);
     let error = use_signal(|| None::<String>);
@@ -1297,15 +1180,7 @@ fn App() -> Element {
     let mut show_welcome = use_signal(|| settings().first_time);
     let mut show_downloads = use_signal(|| false);
     let mut initial_fetch_done = use_signal(|| false);
-
     let lang: Language = settings().language.clone();
-    let resolved_theme = resolve_theme(settings().theme);
-
-    let theme_class = match resolved_theme {
-        Theme::Light => "theme-light",
-        Theme::Dark => "theme-dark",
-        Theme::Auto => "theme-light",
-    };
 
     let fetch_and_set = {
         let weather = weather;
@@ -1455,7 +1330,7 @@ fn App() -> Element {
                 if show_downloads() {
                     DownloadModal {
                         lang: settings().language.clone(),
-                        theme: settings().theme,
+                        theme: resolved_theme,
                         on_close: move |_| show_downloads.set(false),
                     }
                 }
