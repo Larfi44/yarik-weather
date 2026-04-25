@@ -22,6 +22,7 @@ struct GeocodingResult {
 #[derive(Debug, Deserialize)]
 struct OpenMeteoForecast {
     current: CurrentWeather,
+    hourly: HourlyForecast, // <-- new
     daily: DailyForecast,
 }
 
@@ -30,6 +31,14 @@ struct CurrentWeather {
     temperature_2m: f64,
     wind_speed_10m: f64,
     weather_code: u8,
+}
+
+#[derive(Debug, Deserialize)]
+struct HourlyForecast {
+    time: Vec<String>,
+    temperature_2m: Vec<f64>,
+    wind_speed_10m: Vec<f64>,
+    weather_code: Vec<u8>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -62,12 +71,21 @@ struct ArchiveDaily {
 struct WeatherResponse {
     city: String,
     current: CurrentData,
+    hourly: Vec<HourlyData>, // <-- new
     yesterday: DailyData,
     forecast: Vec<DailyData>,
 }
 
 #[derive(Debug, Serialize)]
 struct CurrentData {
+    temperature: f64,
+    wind_speed: f64,
+    condition: String,
+}
+
+#[derive(Debug, Serialize)]
+struct HourlyData {
+    time: String,
     temperature: f64,
     wind_speed: f64,
     condition: String,
@@ -121,20 +139,16 @@ fn weather_description(code: u8) -> &'static str {
     }
 }
 
-// ---------- Moon Phase Calculation (Local) ----------
+// ---------- Moon Phase Calculation ----------
 fn moon_phase_for_date(date: NaiveDate) -> (String, f64) {
     const SYNODIC_MONTH: f64 = 29.530_588_67;
-
     let reference_new_moon = NaiveDate::from_ymd_opt(2000, 1, 6).unwrap();
     let days_since_reference = (date - reference_new_moon).num_days() as f64;
-
     let mut age = days_since_reference % SYNODIC_MONTH;
     if age < 0.0 {
         age += SYNODIC_MONTH;
     }
-
-    let illumination: f64 = ((1.0 - (2.0 * PI * age / SYNODIC_MONTH).cos()) / 2.0) * 100.0;
-
+    let illumination = ((1.0 - (2.0 * PI * age / SYNODIC_MONTH).cos()) / 2.0) * 100.0;
     let phase_name = match age {
         a if a < 1.84566 => "New Moon",
         a if a < 5.53699 => "Waxing Crescent",
@@ -146,7 +160,6 @@ fn moon_phase_for_date(date: NaiveDate) -> (String, f64) {
         a if a < 27.68493 => "Waning Crescent",
         _ => "New Moon",
     };
-
     (phase_name.to_string(), illumination.clamp(0.0, 100.0))
 }
 
@@ -163,43 +176,35 @@ async fn get_coordinates(city: &str) -> Result<(f64, f64), String> {
         "https://geocoding-api.open-meteo.com/v1/search?name={}&count=1&language=en&format=json",
         encoded
     );
-
     let response = reqwest::get(&url)
         .await
         .map_err(|e| format!("Geocoding request failed: {}", e))?;
-
     if !response.status().is_success() {
         return Err(format!("Geocoding API error: {}", response.status()));
     }
-
     let data: GeocodingResponse = response
         .json()
         .await
         .map_err(|e| format!("Failed to parse geocoding JSON: {}", e))?;
-
     let first = data
         .results
         .first()
         .ok_or_else(|| format!("City '{}' not found", city))?;
-
     Ok((first.latitude, first.longitude))
 }
 
 // ---------- Forecast ----------
 async fn fetch_forecast(lat: f64, lon: f64) -> Result<OpenMeteoForecast, String> {
     let url = format!(
-        "https://api.open-meteo.com/v1/forecast?latitude={:.4}&longitude={:.4}&current=temperature_2m,wind_speed_10m,weather_code&daily=temperature_2m_max,temperature_2m_min,wind_speed_10m_max,weather_code,sunrise,sunset&timezone=auto",
+        "https://api.open-meteo.com/v1/forecast?latitude={:.4}&longitude={:.4}&current=temperature_2m,wind_speed_10m,weather_code&hourly=temperature_2m,wind_speed_10m,weather_code&daily=temperature_2m_max,temperature_2m_min,wind_speed_10m_max,weather_code,sunrise,sunset&timezone=auto",
         lat, lon
     );
-
     let response = reqwest::get(&url)
         .await
         .map_err(|e| format!("Forecast request failed: {}", e))?;
-
     if !response.status().is_success() {
         return Err(format!("Forecast API error: {}", response.status()));
     }
-
     response
         .json()
         .await
@@ -210,31 +215,24 @@ async fn fetch_forecast(lat: f64, lon: f64) -> Result<OpenMeteoForecast, String>
 async fn fetch_yesterday(lat: f64, lon: f64) -> Result<DailyData, String> {
     let yesterday_date = (Local::now() - Duration::days(1)).date_naive();
     let date_str = yesterday_date.format("%Y-%m-%d").to_string();
-
     let url = format!(
         "https://archive-api.open-meteo.com/v1/archive?latitude={:.4}&longitude={:.4}&start_date={}&end_date={}&daily=temperature_2m_max,temperature_2m_min,wind_speed_10m_max,weather_code&timezone=auto",
         lat, lon, date_str, date_str
     );
-
     let response = reqwest::get(&url)
         .await
         .map_err(|e| format!("Historical request failed: {}", e))?;
-
     if !response.status().is_success() {
         return Err(format!("Historical API error: {}", response.status()));
     }
-
     let data: OpenMeteoArchive = response
         .json()
         .await
         .map_err(|e| format!("Failed to parse historical JSON: {}", e))?;
-
     if data.daily.time.is_empty() {
         return Err("No historical data available".to_string());
     }
-
     let (moon_phase_name, moon_illumination) = moon_for_date(&date_str).await;
-
     Ok(DailyData {
         date: data.daily.time[0].clone(),
         temperature_max: data.daily.temperature_2m_max[0],
@@ -250,13 +248,11 @@ async fn fetch_yesterday(lat: f64, lon: f64) -> Result<DailyData, String> {
 
 // ---------- Main Handler ----------
 async fn get_weather(Path(city): Path<String>) -> impl IntoResponse {
-    // 1. Geocode city
     let (lat, lon) = match get_coordinates(&city).await {
         Ok(coords) => coords,
         Err(e) => return (StatusCode::BAD_REQUEST, e).into_response(),
     };
 
-    // 2. Fetch forecast and yesterday in parallel
     let (forecast_result, yesterday_result) =
         tokio::join!(fetch_forecast(lat, lon), fetch_yesterday(lat, lon));
 
@@ -270,28 +266,48 @@ async fn get_weather(Path(city): Path<String>) -> impl IntoResponse {
         Err(e) => return (StatusCode::INTERNAL_SERVER_ERROR, e).into_response(),
     };
 
-    // 3. Build current data
     let current = CurrentData {
         temperature: forecast.current.temperature_2m,
         wind_speed: forecast.current.wind_speed_10m,
         condition: weather_description(forecast.current.weather_code).to_string(),
     };
 
-    // 4. Build forecast days (using local moon calculation for each day)
-    let daily = &forecast.daily;
-    let mut forecast_days: Vec<DailyData> = Vec::with_capacity(daily.time.len());
+    // Hourly data for today (first 24 entries)
+    let hourly: Vec<HourlyData> = forecast
+        .hourly
+        .time
+        .iter()
+        .enumerate()
+        .take(24)
+        .map(|(i, time)| {
+            let time_str = time
+                .split('T')
+                .nth(1)
+                .unwrap_or(time)
+                .chars()
+                .take(5)
+                .collect::<String>();
+            HourlyData {
+                time: time_str,
+                temperature: forecast.hourly.temperature_2m[i],
+                wind_speed: forecast.hourly.wind_speed_10m[i],
+                condition: weather_description(forecast.hourly.weather_code[i]).to_string(),
+            }
+        })
+        .collect();
 
-    for (i, date) in daily.time.iter().enumerate() {
+    // Daily forecast with moon
+    let mut forecast_days = Vec::with_capacity(forecast.daily.time.len());
+    for (i, date) in forecast.daily.time.iter().enumerate() {
         let (moon_phase_name, moon_illumination) = moon_for_date(date).await;
-
         forecast_days.push(DailyData {
             date: date.clone(),
-            temperature_max: daily.temperature_2m_max[i],
-            temperature_min: daily.temperature_2m_min[i],
-            wind_speed_max: daily.wind_speed_10m_max[i],
-            condition: weather_description(daily.weather_code[i]).to_string(),
-            sunrise: daily.sunrise.get(i).cloned(),
-            sunset: daily.sunset.get(i).cloned(),
+            temperature_max: forecast.daily.temperature_2m_max[i],
+            temperature_min: forecast.daily.temperature_2m_min[i],
+            wind_speed_max: forecast.daily.wind_speed_10m_max[i],
+            condition: weather_description(forecast.daily.weather_code[i]).to_string(),
+            sunrise: forecast.daily.sunrise.get(i).cloned(),
+            sunset: forecast.daily.sunset.get(i).cloned(),
             moon_phase_name: Some(moon_phase_name),
             moon_illumination: Some(moon_illumination),
         });
@@ -300,6 +316,7 @@ async fn get_weather(Path(city): Path<String>) -> impl IntoResponse {
     let response = WeatherResponse {
         city,
         current,
+        hourly,
         yesterday,
         forecast: forecast_days,
     };

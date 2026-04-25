@@ -16,14 +16,6 @@ const API_URL: &str = "http://127.0.0.1:3000/get_weather";
 
 // ---------- Types ----------
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub struct WeatherResponse {
-    pub city: String,
-    pub current: CurrentData,
-    pub yesterday: DailyData,
-    pub forecast: Vec<DailyData>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct CurrentData {
     pub temperature: f64,
     pub wind_speed: f64,
@@ -41,6 +33,23 @@ pub struct DailyData {
     pub sunset: Option<String>,
     pub moon_phase_name: Option<String>,
     pub moon_illumination: Option<f64>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct HourlyData {
+    pub time: String,
+    pub temperature: f64,
+    pub wind_speed: f64,
+    pub condition: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct WeatherResponse {
+    pub city: String,
+    pub current: CurrentData,
+    pub hourly: Vec<HourlyData>,
+    pub yesterday: DailyData,
+    pub forecast: Vec<DailyData>,
 }
 
 // ---------- Settings ----------
@@ -149,7 +158,7 @@ fn convert_wind(ms: f64, unit: &WindUnit) -> f64 {
     match unit {
         WindUnit::Mps => ms,
         WindUnit::Kmph => ms * 3.6,
-        WindUnit::Mph => ms * 2.236_94,
+        WindUnit::Mph => ms * 2.23694,
     }
 }
 
@@ -188,7 +197,6 @@ fn condition_icon_from_text(condition: &str) -> &'static str {
 
 fn moon_emoji_from_phase(phase: &str) -> &'static str {
     let p = phase.to_lowercase();
-
     if p.contains("new moon") {
         "🌑"
     } else if p.contains("waxing crescent") {
@@ -214,7 +222,6 @@ fn translate_moon_phase(phase: &str, lang: &Language) -> String {
     if *lang == Language::English {
         return phase.to_string();
     }
-
     match phase {
         "New Moon" => "Новолуние".to_string(),
         "Waxing Crescent" => "Растущий серп".to_string(),
@@ -228,47 +235,10 @@ fn translate_moon_phase(phase: &str, lang: &Language) -> String {
     }
 }
 
-fn month_name_en(month: u32) -> &'static str {
-    match month {
-        1 => "January",
-        2 => "February",
-        3 => "March",
-        4 => "April",
-        5 => "May",
-        6 => "June",
-        7 => "July",
-        8 => "August",
-        9 => "September",
-        10 => "October",
-        11 => "November",
-        12 => "December",
-        _ => "Month",
-    }
-}
-
-fn month_name_ru(month: u32) -> &'static str {
-    match month {
-        1 => "января",
-        2 => "февраля",
-        3 => "марта",
-        4 => "апреля",
-        5 => "мая",
-        6 => "июня",
-        7 => "июля",
-        8 => "августа",
-        9 => "сентября",
-        10 => "октября",
-        11 => "ноября",
-        12 => "декабря",
-        _ => "",
-    }
-}
-
 fn translate_condition(condition_en: &str, lang: &Language) -> String {
     if *lang == Language::English {
         return condition_en.to_string();
     }
-
     match condition_en {
         "Clear sky" => "Ясно".to_string(),
         "Mainly clear" => "Преимущественно ясно".to_string(),
@@ -307,10 +277,8 @@ fn format_forecast_label(date_str: &str, index: usize, lang: &Language) -> Strin
     if parts.len() != 3 {
         return date_str.to_string();
     }
-
     let month = parts[1].parse::<u32>().unwrap_or(0);
     let day = parts[2].parse::<u32>().unwrap_or(0);
-
     match index {
         0 => {
             if *lang == Language::English {
@@ -350,6 +318,42 @@ fn format_forecast_label(date_str: &str, index: usize, lang: &Language) -> Strin
     }
 }
 
+fn month_name_en(month: u32) -> &'static str {
+    match month {
+        1 => "January",
+        2 => "February",
+        3 => "March",
+        4 => "April",
+        5 => "May",
+        6 => "June",
+        7 => "July",
+        8 => "August",
+        9 => "September",
+        10 => "October",
+        11 => "November",
+        12 => "December",
+        _ => "Month",
+    }
+}
+
+fn month_name_ru(month: u32) -> &'static str {
+    match month {
+        1 => "января",
+        2 => "февраля",
+        3 => "марта",
+        4 => "апреля",
+        5 => "мая",
+        6 => "июня",
+        7 => "июля",
+        8 => "августа",
+        9 => "сентября",
+        10 => "октября",
+        11 => "ноября",
+        12 => "декабря",
+        _ => "",
+    }
+}
+
 fn open_link(url: &str) {
     use gloo_utils::window;
     let _ = window().open_with_url_and_target(url, "_blank");
@@ -362,43 +366,40 @@ async fn fetch_weather(
     wind_unit: WindUnit,
 ) -> Result<WeatherResponse, String> {
     let url = format!("{}/{}", API_URL, urlencoding::encode(city));
-
     let resp = Request::get(&url)
         .send()
         .await
         .map_err(|e| format!("Network error: {e}"))?;
-
     if !resp.ok() {
         let status = resp.status();
         let text = resp.text().await.unwrap_or_default();
         return Err(format!("API error {}: {}", status, text));
     }
-
     let text = resp
         .text()
         .await
         .map_err(|e| format!("Failed to get text: {e}"))?;
-
     let mut data: WeatherResponse =
         serde_json::from_str(&text).map_err(|e| format!("Failed to parse weather data: {e}"))?;
 
     data.current.temperature = convert_temp(data.current.temperature, &temp_unit);
     data.current.wind_speed = convert_wind(data.current.wind_speed, &wind_unit);
-
     data.yesterday.temperature_max = convert_temp(data.yesterday.temperature_max, &temp_unit);
     data.yesterday.temperature_min = convert_temp(data.yesterday.temperature_min, &temp_unit);
     data.yesterday.wind_speed_max = convert_wind(data.yesterday.wind_speed_max, &wind_unit);
-
+    for h in &mut data.hourly {
+        h.temperature = convert_temp(h.temperature, &temp_unit);
+        h.wind_speed = convert_wind(h.wind_speed, &wind_unit);
+    }
     for f in &mut data.forecast {
         f.temperature_max = convert_temp(f.temperature_max, &temp_unit);
         f.temperature_min = convert_temp(f.temperature_min, &temp_unit);
         f.wind_speed_max = convert_wind(f.wind_speed_max, &wind_unit);
     }
-
     Ok(data)
 }
 
-// ---------- Download Menu ----------
+// ---------- Download Modal ----------
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum DownloadOs {
     Android,
@@ -446,6 +447,39 @@ fn download_url(os: DownloadOs) -> &'static str {
 fn DownloadModal(lang: Language, theme: Theme, on_close: EventHandler<()>) -> Element {
     let mut selected = use_signal(|| DownloadOs::Android);
 
+    let oss = [
+        DownloadOs::Android,
+        DownloadOs::Windows,
+        DownloadOs::MacOS,
+        DownloadOs::Linux,
+    ];
+
+    let download_grid: VNode = rsx! {
+        div { class: "download-grid",
+            for os in oss.iter().copied() {
+                {
+                    let active = selected() == os;
+                    let icon = match os {
+                        DownloadOs::Android => ANDROID_ICON,
+                        DownloadOs::Windows => WINDOWS_ICON,
+                        DownloadOs::MacOS => apple_icon(theme),
+                        DownloadOs::Linux => LINUX_ICON,
+                    };
+                    rsx! {
+                        div {
+                            class: if active { "download-card active" } else { "download-card" },
+                            onclick: move |_| selected.set(os),
+                            img { class: "download-card-icon", src: icon }
+                            div { class: "download-card-title", "{download_label(os, &lang)}" }
+                            div { class: "download-card-desc", "{download_description(os, &lang)}" }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    .unwrap();
+
     rsx! {
         div { class: "modal-overlay",
             div { class: "modal download-modal",
@@ -463,7 +497,6 @@ fn DownloadModal(lang: Language, theme: Theme, on_close: EventHandler<()>) -> El
                         "✖"
                     }
                 }
-
                 p { class: "modal-subtitle",
                     if lang == Language::English {
                         "Choose your platform and download the app."
@@ -471,32 +504,7 @@ fn DownloadModal(lang: Language, theme: Theme, on_close: EventHandler<()>) -> El
                         "Выберите платформу и скачайте приложение."
                     }
                 }
-
-                div { class: "download-grid",
-                    for os in [DownloadOs::Android, DownloadOs::Windows, DownloadOs::MacOS, DownloadOs::Linux] {
-                        {
-                            let active = selected() == os;
-
-                            let icon = match os {
-                                DownloadOs::Android => ANDROID_ICON,
-                                DownloadOs::Windows => WINDOWS_ICON,
-                                DownloadOs::MacOS => apple_icon(theme),
-                                DownloadOs::Linux => LINUX_ICON,
-                            };
-
-                            rsx! {
-                                div {
-                                    class: if active { "download-card active" } else { "download-card" },
-                                    onclick: move |_| selected.set(os),
-                                    img { class: "download-card-icon", src: icon }
-                                    div { class: "download-card-title", "{download_label(os, &lang)}" }
-                                    div { class: "download-card-desc", "{download_description(os, &lang)}" }
-                                }
-                            }
-                        }
-                    }
-                }
-
+                {download_grid}
                 button {
                     class: "primary-btn download-confirm-btn",
                     onclick: move |_| open_link(download_url(selected())),
@@ -511,7 +519,7 @@ fn DownloadModal(lang: Language, theme: Theme, on_close: EventHandler<()>) -> El
     }
 }
 
-// ---------- Settings Modal ----------
+// ---------- Settings Modal (unchanged) ----------
 #[component]
 fn SettingsModal(
     settings: UserSettings,
@@ -520,14 +528,12 @@ fn SettingsModal(
 ) -> Element {
     let mut temp_settings = use_signal(|| settings.clone());
     let lang = temp_settings().language.clone();
-
     let handle_close = move |_| {
         let new_settings = temp_settings();
         save_settings(&new_settings);
         on_save.call(new_settings);
         on_close.call(());
     };
-
     rsx! {
         div { class: "modal-overlay",
             div { class: "modal",
@@ -541,7 +547,6 @@ fn SettingsModal(
                     }
                     button { class: "close-btn", onclick: handle_close, "✖" }
                 }
-
                 div { class: "setting-row",
                     label {
                         if lang == Language::English {
@@ -563,7 +568,6 @@ fn SettingsModal(
                         }
                     }
                 }
-
                 div { class: "setting-row",
                     label {
                         if lang == Language::English {
@@ -602,7 +606,6 @@ fn SettingsModal(
                         }
                     }
                 }
-
                 div { class: "setting-row",
                     label {
                         if lang == Language::English {
@@ -641,7 +644,6 @@ fn SettingsModal(
                         }
                     }
                 }
-
                 div { class: "setting-row",
                     label {
                         if lang == Language::English {
@@ -680,7 +682,6 @@ fn SettingsModal(
                         }
                     }
                 }
-
                 div { class: "setting-row",
                     label {
                         if lang == Language::English {
@@ -700,12 +701,11 @@ fn SettingsModal(
     }
 }
 
-// ---------- Welcome Modal ----------
+// ---------- Welcome Modal (unchanged) ----------
 #[component]
 fn WelcomeModal(on_complete: EventHandler<UserSettings>) -> Element {
     let mut temp_settings = use_signal(UserSettings::default);
     let lang = temp_settings().language.clone();
-
     rsx! {
         div { class: "modal-overlay",
             div { class: "modal welcome-modal",
@@ -723,7 +723,6 @@ fn WelcomeModal(on_complete: EventHandler<UserSettings>) -> Element {
                         "Выберите настройки и начните."
                     }
                 }
-
                 div { class: "setting-row",
                     label {
                         if lang == Language::English {
@@ -745,7 +744,6 @@ fn WelcomeModal(on_complete: EventHandler<UserSettings>) -> Element {
                         }
                     }
                 }
-
                 div { class: "setting-row",
                     label {
                         if lang == Language::English {
@@ -784,7 +782,6 @@ fn WelcomeModal(on_complete: EventHandler<UserSettings>) -> Element {
                         }
                     }
                 }
-
                 div { class: "setting-row",
                     label {
                         if lang == Language::English {
@@ -823,7 +820,6 @@ fn WelcomeModal(on_complete: EventHandler<UserSettings>) -> Element {
                         }
                     }
                 }
-
                 div { class: "setting-row",
                     label {
                         if lang == Language::English {
@@ -862,7 +858,6 @@ fn WelcomeModal(on_complete: EventHandler<UserSettings>) -> Element {
                         }
                     }
                 }
-
                 div { class: "setting-row",
                     label {
                         if lang == Language::English {
@@ -878,7 +873,6 @@ fn WelcomeModal(on_complete: EventHandler<UserSettings>) -> Element {
                         oninput: move |e| temp_settings.write().default_city = e.value(),
                     }
                 }
-
                 button {
                     class: "primary-btn",
                     onclick: move |_| {
@@ -898,12 +892,11 @@ fn WelcomeModal(on_complete: EventHandler<UserSettings>) -> Element {
     }
 }
 
-// ---------- Search Bar ----------
+// ---------- Search Bar (unchanged) ----------
 #[component]
 fn SearchBar(on_search: EventHandler<String>) -> Element {
     let mut city = use_signal(|| "".to_string());
     let lang = get_settings().language;
-
     rsx! {
         div { class: "search-container",
             input {
@@ -938,7 +931,6 @@ fn SearchBar(on_search: EventHandler<String>) -> Element {
     }
 }
 
-// ---------- Weather Display ----------
 #[component]
 fn WeatherDisplay(
     data: WeatherResponse,
@@ -951,7 +943,6 @@ fn WeatherDisplay(
         TempUnit::Fahrenheit => "°F",
         TempUnit::Kelvin => "K",
     };
-
     let wind_unit_str = match wind_unit {
         WindUnit::Mps => {
             if lang == Language::English {
@@ -975,27 +966,466 @@ fn WeatherDisplay(
             }
         }
     };
-
     let condition_icon_str = condition_icon_from_text(&data.current.condition);
+    let na = || "N/A".to_string();
 
+    // ==================== HOURLY CHART ====================
+    struct HourlyPoint {
+        x: f64,
+        y: f64,
+        index: usize,
+        icon: &'static str,
+        time: String,
+        temp: f64,
+        wind: f64,
+        condition: String,
+        temp_str: String,
+        time_str: String,
+    }
+
+    let h_min_temp = data
+        .hourly
+        .iter()
+        .map(|h| h.temperature)
+        .fold(f64::INFINITY, f64::min);
+    let h_max_temp = data
+        .hourly
+        .iter()
+        .map(|h| h.temperature)
+        .fold(f64::NEG_INFINITY, f64::max);
+    let h_temp_range = (h_max_temp - h_min_temp).max(0.1);
+
+    let h_chart_width: f64 = if data.hourly.len() > 12 {
+        1200.0
+    } else {
+        700.0
+    };
+    let h_chart_height = 200.0;
+    let h_padding = 40.0;
+    let h_plot_width = h_chart_width - 2.0 * h_padding;
+    let h_plot_height = h_chart_height - 2.0 * h_padding;
+
+    let h_step_x = if data.hourly.len() > 1 {
+        h_plot_width / (data.hourly.len() - 1) as f64
+    } else {
+        0.0
+    };
+    let h_to_y = |t: f64| -> f64 {
+        h_chart_height - h_padding - ((t - h_min_temp) / h_temp_range) * h_plot_height
+    };
+
+    let h_points_line: Vec<String> = data
+        .hourly
+        .iter()
+        .enumerate()
+        .map(|(i, h)| {
+            format!(
+                "{:.1},{:.1}",
+                h_padding + h_step_x * i as f64,
+                h_to_y(h.temperature)
+            )
+        })
+        .collect();
+
+    let h_points: &'static [HourlyPoint] = Vec::leak(
+        data.hourly
+            .iter()
+            .enumerate()
+            .map(|(i, h)| {
+                let x = h_padding + h_step_x * i as f64;
+                let y = h_to_y(h.temperature);
+                let icon = condition_icon_from_text(&h.condition);
+                let temp_str = format!("{:.0}{}", h.temperature, temp_unit_str);
+                let time_str = h.time.clone();
+                HourlyPoint {
+                    x,
+                    y,
+                    index: i,
+                    icon,
+                    time: h.time.clone(),
+                    temp: h.temperature,
+                    wind: h.wind_speed,
+                    condition: h.condition.clone(),
+                    temp_str,
+                    time_str,
+                }
+            })
+            .collect::<Vec<_>>(),
+    );
+
+    let mut h_hovered = use_signal(|| None::<usize>);
+
+    let hourly_chart: VNode = rsx! {
+        div { class: "chart-scroll",
+            svg {
+                view_box: format!("0 0 {:.0} {:.0}", h_chart_width, h_chart_height),
+                width: format!("{}px", h_chart_width),
+                style: "overflow: visible;",
+                polyline {
+                    fill: "none",
+                    stroke: "var(--accent, orange)",
+                    stroke_width: 2.0,
+                    stroke_linejoin: "round",
+                    stroke_linecap: "round",
+                    points: h_points_line.join(" "),
+                }
+                for p in h_points.iter() {
+                    circle {
+                        cx: format!("{:.1}", p.x),
+                        cy: format!("{:.1}", p.y),
+                        r: if h_hovered() == Some(p.index) { 5 } else { 3 },
+                        fill: "var(--accent, orange)",
+                        stroke: "white",
+                        stroke_width: 1.0,
+                        class: "chart-point",
+                        onmouseenter: move |_| h_hovered.set(Some(p.index)),
+                        onmouseleave: move |_| h_hovered.set(None),
+                    }
+                    text {
+                        x: format!("{:.1}", p.x),
+                        y: format!("{:.1}", p.y - 12.0),
+                        text_anchor: "middle",
+                        font_size: "10",
+                        fill: "white",
+                        "{p.temp_str}"
+                    }
+                    text {
+                        x: format!("{:.1}", p.x),
+                        y: format!("{:.0}", h_chart_height - 8.0),
+                        text_anchor: "middle",
+                        font_size: "9",
+                        fill: "var(--muted, #ccc)",
+                        "{p.time_str}"
+                    }
+                }
+            }
+        }
+    }
+    .unwrap();
+
+    let hourly_tooltip: Option<VNode> = h_hovered().and_then(|idx| {
+        h_points.get(idx).map(|p| {
+            let cond_icon = p.icon;
+            let cond_text = translate_condition(&p.condition, &lang);
+            let temp_str = format!("{:.1}{}", p.temp, temp_unit_str);
+            let wind_str = format!(
+                "{}: {:.1} {}",
+                if lang == Language::English {
+                    "Wind"
+                } else {
+                    "Ветер"
+                },
+                p.wind,
+                wind_unit_str
+            );
+            rsx! {
+                div { class: "chart-tooltip",
+                    div { class: "tooltip-time", "{p.time}" }
+                    div { class: "tooltip-condition",
+                        span { "{cond_icon}" }
+                        span { "{cond_text}" }
+                    }
+                    div { class: "tooltip-temp", "{temp_str}" }
+                    div { class: "tooltip-wind", "{wind_str}" }
+                }
+            }
+            .unwrap()
+        })
+    });
+
+    // ==================== DAILY CHART ====================
+    let mut chart_days: Vec<&DailyData> = Vec::with_capacity(1 + data.forecast.len());
+    chart_days.push(&data.yesterday);
+    for d in &data.forecast {
+        chart_days.push(d);
+    }
+
+    let min_temp = chart_days
+        .iter()
+        .map(|d| d.temperature_min)
+        .fold(f64::INFINITY, f64::min);
+    let max_temp = chart_days
+        .iter()
+        .map(|d| d.temperature_max)
+        .fold(f64::NEG_INFINITY, f64::max);
+    let temp_range = (max_temp - min_temp).max(0.1);
+
+    let chart_width = 800.0;
+    let chart_height = 300.0;
+    let padding = 60.0;
+    let plot_width = chart_width - 2.0 * padding;
+    let plot_height = chart_height - 2.0 * padding;
+
+    let step_x = if chart_days.len() > 1 {
+        plot_width / (chart_days.len() - 1) as f64
+    } else {
+        0.0
+    };
+    let to_y =
+        |t: f64| -> f64 { chart_height - padding - ((t - min_temp) / temp_range) * plot_height };
+
+    let max_points: Vec<String> = chart_days
+        .iter()
+        .enumerate()
+        .map(|(i, d)| {
+            format!(
+                "{:.1},{:.1}",
+                padding + step_x * i as f64,
+                to_y(d.temperature_max)
+            )
+        })
+        .collect();
+    let min_points: Vec<String> = chart_days
+        .iter()
+        .enumerate()
+        .map(|(i, d)| {
+            format!(
+                "{:.1},{:.1}",
+                padding + step_x * i as f64,
+                to_y(d.temperature_min)
+            )
+        })
+        .collect();
+
+    struct DailyPoint {
+        x: f64,
+        y_max: f64,
+        y_min: f64,
+        index: usize,
+        icon: &'static str,
+        label: String,
+        max_temp: f64,
+        min_temp: f64,
+        wind: f64,
+        condition: String,
+        date: String,
+        max_temp_str: String,
+        min_temp_str: String,
+    }
+
+    let d_points: &'static [DailyPoint] = Vec::leak(
+        chart_days
+            .iter()
+            .enumerate()
+            .map(|(i, day)| {
+                let x = padding + step_x * i as f64;
+                let y_max = to_y(day.temperature_max);
+                let y_min = to_y(day.temperature_min);
+                let icon = condition_icon_from_text(&day.condition);
+                let label = if i == 0 {
+                    if lang == Language::English {
+                        "Yesterday".to_string()
+                    } else {
+                        "Вчера".to_string()
+                    }
+                } else {
+                    format_forecast_label(&day.date, i - 1, &lang)
+                };
+                let max_temp_str = format!("{:.0}{}", day.temperature_max, temp_unit_str);
+                let min_temp_str = format!("{:.0}{}", day.temperature_min, temp_unit_str);
+                DailyPoint {
+                    x,
+                    y_max,
+                    y_min,
+                    index: i,
+                    icon,
+                    label,
+                    max_temp: day.temperature_max,
+                    min_temp: day.temperature_min,
+                    wind: day.wind_speed_max,
+                    condition: day.condition.clone(),
+                    date: day.date.clone(),
+                    max_temp_str,
+                    min_temp_str,
+                }
+            })
+            .collect::<Vec<_>>(),
+    );
+
+    let mut d_hovered = use_signal(|| None::<usize>);
+
+    let daily_chart: VNode = rsx! {
+        svg {
+            view_box: format!("0 0 {:.0} {:.0}", chart_width, chart_height),
+            width: "100%",
+            style: "overflow: visible;",
+            polyline {
+                fill: "none",
+                stroke: "var(--accent, orange)",
+                stroke_width: 2.5,
+                stroke_linejoin: "round",
+                stroke_linecap: "round",
+                points: max_points.join(" "),
+            }
+            polyline {
+                fill: "none",
+                stroke: "var(--accent2, #7cdb7a)",
+                stroke_width: 2.0,
+                stroke_linejoin: "round",
+                stroke_linecap: "round",
+                points: min_points.join(" "),
+            }
+            for p in d_points.iter() {
+                circle {
+                    cx: format!("{:.1}", p.x),
+                    cy: format!("{:.1}", p.y_max),
+                    r: if d_hovered() == Some(p.index) { 7 } else { 5 },
+                    fill: "var(--accent, orange)",
+                    stroke: "white",
+                    stroke_width: 1.5,
+                    class: "chart-point",
+                    onmouseenter: move |_| d_hovered.set(Some(p.index)),
+                    onmouseleave: move |_| d_hovered.set(None),
+                }
+                circle {
+                    cx: format!("{:.1}", p.x),
+                    cy: format!("{:.1}", p.y_min),
+                    r: if d_hovered() == Some(p.index) { 7 } else { 5 },
+                    fill: "var(--accent2, #7cdb7a)",
+                    stroke: "white",
+                    stroke_width: 1.5,
+                    class: "chart-point",
+                    onmouseenter: move |_| d_hovered.set(Some(p.index)),
+                    onmouseleave: move |_| d_hovered.set(None),
+                }
+                text {
+                    x: format!("{:.1}", p.x),
+                    y: format!("{:.1}", p.y_max - 16.0),
+                    text_anchor: "middle",
+                    font_size: "11",
+                    fill: "var(--accent, orange)",
+                    "{p.max_temp_str}"
+                }
+                text {
+                    x: format!("{:.1}", p.x),
+                    y: format!("{:.1}", p.y_min + 20.0),
+                    text_anchor: "middle",
+                    font_size: "11",
+                    fill: "var(--accent2, #7cdb7a)",
+                    "{p.min_temp_str}"
+                }
+                text {
+                    x: format!("{:.1}", p.x),
+                    y: format!("{:.1}", p.y_max - 32.0),
+                    text_anchor: "middle",
+                    font_size: "20",
+                    fill: "white",
+                    "{p.icon}"
+                }
+                text {
+                    x: format!("{:.1}", p.x),
+                    y: format!("{:.0}", chart_height - 8.0),
+                    text_anchor: "middle",
+                    font_size: "12",
+                    fill: "var(--muted, #ccc)",
+                    "{p.label}"
+                }
+            }
+        }
+    }
+    .unwrap();
+
+    let daily_tooltip: Option<VNode> = d_hovered().and_then(|idx| {
+        chart_days.get(idx).map(|day| {
+            let date_label = format_forecast_label(&day.date, idx, &lang);
+            let cond_icon = condition_icon_from_text(&day.condition);
+            let cond_text = translate_condition(&day.condition, &lang);
+            let high = format!("H: {:.0}{}", day.temperature_max, temp_unit_str);
+            let low = format!("L: {:.0}{}", day.temperature_min, temp_unit_str);
+            let wind = format!(
+                "{}: {:.1} {}",
+                if lang == Language::English {
+                    "Wind"
+                } else {
+                    "Ветер"
+                },
+                day.wind_speed_max,
+                wind_unit_str
+            );
+            rsx! {
+                div { class: "chart-tooltip",
+                    div { class: "tooltip-date", "{date_label}" }
+                    div { class: "tooltip-condition",
+                        span { "{cond_icon}" }
+                        span { "{cond_text}" }
+                    }
+                    div { class: "tooltip-temps",
+                        span { class: "tooltip-high", "{high}" }
+                        span { class: "tooltip-low", "{low}" }
+                    }
+                    div { class: "tooltip-wind", "{wind}" }
+                }
+            }
+            .unwrap()
+        })
+    });
+
+    // ==================== ASTRONOMY ====================
+    let astronomy_section: Option<VNode> = data.forecast.first().map(|first_day| {
+        let moon_phase = first_day.moon_phase_name.clone().unwrap_or_else(|| "Unknown".to_string());
+        let moon_emoji = moon_emoji_from_phase(&moon_phase);
+        let moon_percent = first_day.moon_illumination.map(|v| format!("{:.0}%", v)).unwrap_or_else(na);
+        let moon_illum_str = if lang == Language::English {
+            format!("Illumination: {}", moon_percent)
+        } else {
+            format!("Освещённость: {}", moon_percent)
+        };
+        rsx! {
+            div { class: "astronomy-section glass-card",
+                h3 {
+                    if lang == Language::English {
+                        "Sun & Moon"
+                    } else {
+                        "Солнце и Луна"
+                    }
+                }
+                div { class: "astronomy-grid",
+                    div { class: "astro-card",
+                        p {
+                            {
+                                format!(
+                                    "🌅 {}: {}",
+                                    if lang == Language::English { "Sunrise" } else { "Восход" },
+                                    first_day.sunrise.as_deref().map(format_time).unwrap_or_else(na),
+                                )
+                            }
+                        }
+                        p {
+                            {
+                                format!(
+                                    "🌇 {}: {}",
+                                    if lang == Language::English { "Sunset" } else { "Закат" },
+                                    first_day.sunset.as_deref().map(format_time).unwrap_or_else(na),
+                                )
+                            }
+                        }
+                    }
+                    div { class: "astro-card",
+                        p { "{moon_emoji}" }
+                        p { "{translate_moon_phase(&moon_phase, &lang)}" }
+                        p { "{moon_illum_str}" }
+                    }
+                }
+            }
+        }.unwrap()
+    });
+
+    // ==================== MAIN LAYOUT ====================
     rsx! {
         div { class: "weather-container",
             div { class: "current-weather glass-card",
                 div { class: "city-line",
                     h2 { "{data.city}" }
                 }
-
                 div { class: "temp-large",
                     {format!("{:.1}{}", data.current.temperature, temp_unit_str)}
                 }
-
                 div { class: "condition-line",
                     span { class: "condition-icon", "{condition_icon_str}" }
                     span { class: "condition-text",
                         "{translate_condition(&data.current.condition, &lang)}"
                     }
                 }
-
                 div { class: "weather-details",
                     p {
                         {
@@ -1009,7 +1439,19 @@ fn WeatherDisplay(
                     }
                 }
             }
-
+            div { class: "forecast-section glass-card",
+                h3 {
+                    if lang == Language::English {
+                        "Hourly Forecast (24h)"
+                    } else {
+                        "Почасовой прогноз (24ч)"
+                    }
+                }
+                div { class: "chart-container",
+                    {hourly_chart}
+                    {hourly_tooltip}
+                }
+            }
             div { class: "forecast-section glass-card",
                 h3 {
                     if lang == Language::English {
@@ -1018,110 +1460,12 @@ fn WeatherDisplay(
                         "Прогноз на 7 дней"
                     }
                 }
-                div { class: "forecast-grid",
-                    for (idx , f) in data.forecast.iter().enumerate().take(7) {
-                        {
-                            let label = format_forecast_label(&f.date, idx, &lang);
-                            let icon = condition_icon_from_text(&f.condition);
-                            let bar_height = ((f.temperature_max + 20.0) * 2.4).clamp(28.0, 165.0);
-
-                            rsx! {
-                                div { class: "forecast-card",
-                                    div { class: "bar-label", "{label}" }
-                                    div { class: "bar-wrap",
-                                        div { class: "bar", style: format!("height: {bar_height}px;") }
-                                    }
-                                    div { class: "bar-value", {format!("{:.0}{}", f.temperature_max, temp_unit_str)} }
-                                    div { class: "bar-min", {format!("{:.0}{}", f.temperature_min, temp_unit_str)} }
-                                    div { class: "bar-icon", "{icon}" }
-                                    div { class: "bar-text", "{translate_condition(&f.condition, &lang)}" }
-                                    div { class: "bar-wind",
-                                        {
-                                            format!(
-                                                "{} {:.1} {}",
-                                                if lang == Language::English { "wind:" } else { "ветер:" },
-                                                f.wind_speed_max,
-                                                wind_unit_str,
-                                            )
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
+                div { class: "chart-container",
+                    {daily_chart}
+                    {daily_tooltip}
                 }
             }
-
-            if let Some(first_day) = data.forecast.first() {
-                {
-                    let moon_phase = first_day
-                        .moon_phase_name
-                        .clone()
-                        .unwrap_or_else(|| "Unknown".to_string());
-
-                    let moon_emoji = moon_emoji_from_phase(&moon_phase);
-
-                    let moon_percent = first_day
-                        .moon_illumination
-                        .map(|v| format!("{:.0}%", v))
-                        .unwrap_or_else(|| "N/A".to_string());
-
-                    rsx! {
-                        div { class: "astronomy-section glass-card",
-                            h3 {
-                                if lang == Language::English {
-                                    "Sun & Moon"
-                                } else {
-                                    "Солнце и Луна"
-                                }
-                            }
-
-        
-        
-        
-        
-        
-        
-        
-                            div { class: "astronomy-grid",
-                                div { class: "astro-card",
-                                    p {
-                                        {
-                                            format!(
-                                                "🌅 {}: {}",
-                                                if lang == Language::English { "Sunrise" } else { "Восход" },
-                                                first_day.sunrise.as_deref().map(format_time).unwrap_or("N/A".to_string()),
-                                            )
-                                        }
-                                    }
-                                    p {
-                                        {
-                                            format!(
-                                                "🌇 {}: {}",
-                                                if lang == Language::English { "Sunset" } else { "Закат" },
-                                                first_day.sunset.as_deref().map(format_time).unwrap_or("N/A".to_string()),
-                                            )
-                                        }
-                                    }
-                                }
-                                div { class: "astro-card",
-                                    p { "{moon_emoji}" }
-                                    p { "{translate_moon_phase(&moon_phase, &lang)}" }
-                                    p {
-                                        {
-                                            if lang == Language::English {
-                                                format!("Illumination: {}", moon_percent)
-                                            } else {
-                                                format!("Освещённость: {}", moon_percent)
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
+            {astronomy_section}
         }
     }
 }
@@ -1134,7 +1478,6 @@ fn main() {
 #[component]
 fn App() -> Element {
     let mut settings = use_signal(get_settings);
-    #[allow(warnings)]
     let mut system_theme = use_signal(|| Theme::Light);
     use_effect(move || {
         #[cfg(target_arch = "wasm32")]
@@ -1142,20 +1485,16 @@ fn App() -> Element {
             use gloo::events::EventListener;
             use gloo::utils::window;
             use wasm_bindgen::JsCast;
-
             if let Ok(Some(media_query)) = window().match_media("(prefers-color-scheme: dark)") {
                 let mut update = move |matches: bool| {
                     system_theme.set(if matches { Theme::Dark } else { Theme::Light });
                 };
-
                 update(media_query.matches());
-
                 let listener = EventListener::new(&media_query, "change", move |event| {
                     if let Some(event) = event.dyn_ref::<web_sys::MediaQueryListEvent>() {
                         update(event.matches());
                     }
                 });
-
                 listener.forget();
             }
         }
@@ -1172,7 +1511,6 @@ fn App() -> Element {
         Theme::Auto => "theme-light",
     };
 
-    // ---- Rest of your existing App code (weather, loading, error, modals, etc.) ----
     let weather = use_signal(|| None::<WeatherResponse>);
     let loading = use_signal(|| false);
     let error = use_signal(|| None::<String>);
@@ -1186,15 +1524,12 @@ fn App() -> Element {
         let weather = weather;
         let loading = loading;
         let error = error;
-
         move |city: String, temp_unit: TempUnit, wind_unit: WindUnit| {
             let mut weather = weather;
             let mut loading = loading;
             let mut error = error;
-
             loading.set(true);
             error.set(None);
-
             spawn(async move {
                 match fetch_weather(&city, temp_unit, wind_unit).await {
                     Ok(data) => {
@@ -1215,7 +1550,6 @@ fn App() -> Element {
         if initial_fetch_done() {
             return;
         }
-
         if !settings().first_time {
             initial_fetch_done.set(true);
             let city = settings().default_city.clone();
@@ -1228,7 +1562,6 @@ fn App() -> Element {
     rsx! {
         document::Link { rel: "stylesheet", href: CSS }
         document::Link { rel: "icon", href: FAVICON }
-
         div { class: format!("app-shell {}", theme_class),
             div { class: "app-container",
                 div { class: "header glass-card",
@@ -1236,7 +1569,6 @@ fn App() -> Element {
                         img { src: FAVICON, class: "header-icon" }
                         h1 { "Yarik Weather" }
                     }
-
                     div { class: "header-buttons",
                         button {
                             class: "icon-btn",
@@ -1260,7 +1592,6 @@ fn App() -> Element {
                         }
                     }
                 }
-
                 SearchBar {
                     on_search: move |city: String| {
                         let temp_unit = settings().temp_unit.clone();
@@ -1268,7 +1599,6 @@ fn App() -> Element {
                         fetch_and_set(city, temp_unit, wind_unit);
                     },
                 }
-
                 if loading() {
                     div { class: "status-card glass-card",
                         if lang == Language::English {
@@ -1278,7 +1608,6 @@ fn App() -> Element {
                         }
                     }
                 }
-
                 if let Some(err) = error() {
                     div { class: "status-card error-card glass-card",
                         div { class: "error-title",
@@ -1291,7 +1620,6 @@ fn App() -> Element {
                         div { class: "error-message", "{err}" }
                     }
                 }
-
                 if let Some(ref data) = weather() {
                     WeatherDisplay {
                         data: data.clone(),
@@ -1308,7 +1636,6 @@ fn App() -> Element {
                         }
                     }
                 }
-
                 if show_settings() {
                     SettingsModal {
                         settings: settings(),
@@ -1326,7 +1653,6 @@ fn App() -> Element {
                         on_close: move |_| show_settings.set(false),
                     }
                 }
-
                 if show_downloads() {
                     DownloadModal {
                         lang: settings().language.clone(),
@@ -1334,7 +1660,6 @@ fn App() -> Element {
                         on_close: move |_| show_downloads.set(false),
                     }
                 }
-
                 if show_welcome() {
                     WelcomeModal {
                         on_complete: move |new_settings: UserSettings| {

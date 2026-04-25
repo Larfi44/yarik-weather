@@ -710,3 +710,67 @@ select {
         min-height: 220px;
     }
 }
+
+.hourly-section {
+    margin-top: 18px;
+}
+
+.hourly-scroll {
+    display: flex;
+    overflow-x: auto;
+    gap: 10px;
+    padding-bottom: 8px;
+}
+
+.hourly-card {
+    min-width: 70px;
+    text-align: center;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 12px;
+    padding: 10px;
+}
+
+.hourly-time {
+    font-size: 0.85rem;
+    color: var(--muted);
+}
+
+.hourly-icon {
+    font-size: 1.3rem;
+}
+
+.hourly-temp {
+    font-weight: 700;
+}
+
+.hourly-wind {
+    font-size: 0.8rem;
+    color: var(--muted);
+}
+
+.chart-scroll {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+.chart-container {
+    position: relative;
+    width: 100%;
+    max-width: 100%;
+    margin: 0 auto;
+}
+
+.chart-tooltip {
+    position: absolute;
+    background: var(--card);
+    backdrop-filter: blur(10px);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 10px 14px;
+    color: var(--text);
+    pointer-events: none;
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
+    z-index: 10;
+    text-align: center;
+    min-width: 150px;
+}
