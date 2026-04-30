@@ -1,8 +1,11 @@
 #![allow(warnings)]
 
 use crate::api::fetch_weather;
-use crate::download_modal::DownloadModal;
-use crate::search_bar::SearchBar;
+use crate::components::download_modal::DownloadModal;
+use crate::components::search_bar::SearchBar;
+use crate::components::settings_modal::SettingsModal;
+use crate::components::weather_display::WeatherDisplay;
+use crate::components::welcome_modal::WelcomeModal;
 use crate::settings::cycle_theme;
 use crate::settings::get_settings;
 use crate::settings::save_settings;
@@ -12,10 +15,7 @@ use crate::settings::TempUnit;
 use crate::settings::Theme;
 use crate::settings::UserSettings;
 use crate::settings::WindUnit;
-use crate::settings_modal::SettingsModal;
 use crate::types::WeatherResponse;
-use crate::weather_display::WeatherDisplay;
-use crate::welcome_modal::WelcomeModal;
 
 use dioxus::prelude::*;
 
@@ -48,7 +48,7 @@ pub fn App() -> Element {
         }
     });
 
-    let resolved_theme = match settings().theme {
+    let resolved_theme: Theme = match settings().theme {
         Theme::Auto => system_theme(),
         other => other,
     };
@@ -186,23 +186,32 @@ pub fn App() -> Element {
                     }
                 }
                 if show_settings() {
-                    SettingsModal {
-                        settings: settings(),
-                        on_save: move |new_settings: UserSettings| {
-                            settings.set(new_settings.clone());
-                            save_settings(&new_settings);
-                            let city = new_settings.default_city.clone();
-                            fetch_and_set(
-                                city,
-                                new_settings.temp_unit.clone(),
-                                new_settings.wind_unit.clone(),
-                            );
-                            show_settings.set(false);
-                        },
-                        on_close: move |_| show_settings.set(false),
-                        on_change: move |new_settings: UserSettings| {
-                            settings.set(new_settings);
-                        },
+                    if show_settings() {
+                        SettingsModal {
+                            settings: settings(),
+                            theme: resolved_theme,
+                            on_save: move |new_settings: UserSettings| {
+                                let old = settings();
+                                let needs_refetch = new_settings.default_city != old.default_city
+                                    || new_settings.temp_unit != old.temp_unit
+                                    || new_settings.wind_unit != old.wind_unit;
+                                settings.set(new_settings.clone());
+                                save_settings(&new_settings);
+                                if needs_refetch {
+                                    let city = new_settings.default_city.clone();
+                                    fetch_and_set(
+                                        city,
+                                        new_settings.temp_unit.clone(),
+                                        new_settings.wind_unit.clone(),
+                                    );
+                                }
+                                show_settings.set(false);
+                            },
+                            on_close: move |_| show_settings.set(false),
+                            on_change: move |new_settings: UserSettings| {
+                                settings.set(new_settings);
+                            },
+                        }
                     }
                 }
                 if show_downloads() {
@@ -223,6 +232,9 @@ pub fn App() -> Element {
                                 new_settings.temp_unit.clone(),
                                 new_settings.wind_unit.clone(),
                             );
+                        },
+                        on_change: move |new_settings: UserSettings| {
+                            settings.set(new_settings);
                         },
                     }
                 }

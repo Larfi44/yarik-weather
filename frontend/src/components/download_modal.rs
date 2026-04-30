@@ -1,10 +1,10 @@
+use crate::assets::ANDROID_ICON;
+use crate::assets::LINUX_ICON;
+use crate::assets::WINDOWS_ICON;
 use crate::helpers::open_link;
 use crate::settings::apple_icon;
 use crate::settings::Language;
 use crate::settings::Theme;
-use crate::ANDROID_ICON;
-use crate::LINUX_ICON;
-use crate::WINDOWS_ICON;
 
 use dioxus::prelude::*;
 

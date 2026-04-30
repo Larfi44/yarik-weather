@@ -1,6 +1,6 @@
 use crate::api::SETTINGS_KEY;
-use crate::APPLE_DARK;
-use crate::APPLE_LIGHT;
+use crate::assets::APPLE_DARK;
+use crate::assets::APPLE_LIGHT;
 
 use dioxus::prelude::*;
 use gloo_storage::{LocalStorage, Storage};

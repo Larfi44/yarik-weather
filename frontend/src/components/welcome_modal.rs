@@ -9,33 +9,37 @@ use crate::settings::WindUnit;
 use dioxus::prelude::*;
 
 #[component]
-pub fn SettingsModal(
-    settings: UserSettings,
-    on_save: EventHandler<UserSettings>,
-    on_close: EventHandler<()>,
+pub fn WelcomeModal(
+    on_complete: EventHandler<UserSettings>,
     on_change: EventHandler<UserSettings>,
 ) -> Element {
-    let mut temp_settings = use_signal(|| settings.clone());
+    let mut temp_settings = use_signal(UserSettings::default);
     let lang = temp_settings().language.clone();
-    let handle_close = move |_| {
-        let new_settings = temp_settings();
-        save_settings(&new_settings);
-        on_save.call(new_settings);
-        on_close.call(());
+
+    let notify_change = {
+        let temp_settings = temp_settings.clone();
+        let on_change = on_change.clone();
+        move || on_change.call(temp_settings())
     };
+
     rsx! {
         div { class: "modal-overlay",
-            div { class: "modal",
-                div { class: "modal-topbar",
-                    h2 {
-                        if lang == Language::English {
-                            "Settings"
-                        } else {
-                            "Настройки"
-                        }
+            div { class: "modal welcome-modal",
+                h2 { display: "flex", justify_content: "center",
+                    if lang == Language::English {
+                        "Welcome to Yarik Weather!"
+                    } else {
+                        "Добро пожаловать в Yarik Weather!"
                     }
-                    button { class: "close-btn", onclick: handle_close, "✖" }
                 }
+                p { display: "flex", justify_content: "center",
+                    if lang == Language::English {
+                        "Choose your preferences and start."
+                    } else {
+                        "Выберите настройки и начните."
+                    }
+                }
+
                 div { class: "setting-row",
                     label {
                         if lang == Language::English {
@@ -47,16 +51,23 @@ pub fn SettingsModal(
                     div { class: "choice-group",
                         button {
                             class: choice_btn_class(temp_settings().language == Language::English),
-                            onclick: move |_| temp_settings.write().language = Language::English,
+                            onclick: move |_| {
+                                temp_settings.write().language = Language::English;
+                                notify_change();
+                            },
                             "English"
                         }
                         button {
                             class: choice_btn_class(temp_settings().language == Language::Russian),
-                            onclick: move |_| temp_settings.write().language = Language::Russian,
+                            onclick: move |_| {
+                                temp_settings.write().language = Language::Russian;
+                                notify_change();
+                            },
                             "Русский"
                         }
                     }
                 }
+
                 div { class: "setting-row",
                     label {
                         if lang == Language::English {
@@ -95,6 +106,7 @@ pub fn SettingsModal(
                         }
                     }
                 }
+
                 div { class: "setting-row",
                     label {
                         if lang == Language::English {
@@ -133,6 +145,7 @@ pub fn SettingsModal(
                         }
                     }
                 }
+
                 div { class: "setting-row",
                     label {
                         if lang == Language::English {
@@ -144,7 +157,10 @@ pub fn SettingsModal(
                     div { class: "choice-group",
                         button {
                             class: choice_btn_class(temp_settings().theme == Theme::Auto),
-                            onclick: move |_| temp_settings.write().theme = Theme::Auto,
+                            onclick: move |_| {
+                                temp_settings.write().theme = Theme::Auto;
+                                notify_change();
+                            },
                             if lang == Language::English {
                                 "Auto"
                             } else {
@@ -153,7 +169,10 @@ pub fn SettingsModal(
                         }
                         button {
                             class: choice_btn_class(temp_settings().theme == Theme::Light),
-                            onclick: move |_| temp_settings.write().theme = Theme::Light,
+                            onclick: move |_| {
+                                temp_settings.write().theme = Theme::Light;
+                                notify_change();
+                            },
                             if lang == Language::English {
                                 "Light"
                             } else {
@@ -162,7 +181,10 @@ pub fn SettingsModal(
                         }
                         button {
                             class: choice_btn_class(temp_settings().theme == Theme::Dark),
-                            onclick: move |_| temp_settings.write().theme = Theme::Dark,
+                            onclick: move |_| {
+                                temp_settings.write().theme = Theme::Dark;
+                                notify_change();
+                            },
                             if lang == Language::English {
                                 "Dark"
                             } else {
@@ -171,6 +193,7 @@ pub fn SettingsModal(
                         }
                     }
                 }
+
                 div { class: "setting-row",
                     label {
                         if lang == Language::English {
@@ -181,8 +204,26 @@ pub fn SettingsModal(
                     }
                     input {
                         class: "text-input",
+                        placeholder: if lang == Language::English { "Enter city name" } else { "Введите название города" },
                         value: temp_settings().default_city.clone(),
                         oninput: move |e| temp_settings.write().default_city = e.value(),
+                    }
+                }
+
+                div { style: "display: flex; justify-content: center; margin-top: 20px;",
+                    button {
+                        class: "primary-btn",
+                        onclick: move |_| {
+                            let mut new_settings = temp_settings();
+                            new_settings.first_time = false;
+                            save_settings(&new_settings);
+                            on_complete.call(new_settings);
+                        },
+                        if lang == Language::English {
+                            "Get Started"
+                        } else {
+                            "Начать"
+                        }
                     }
                 }
             }
