@@ -9,6 +9,7 @@ use crate::settings::TempUnit;
 use crate::settings::Theme;
 use crate::settings::WindUnit;
 use crate::types::DailyData;
+use crate::types::HourlyData;
 use crate::types::WeatherResponse;
 
 use chrono::Local;
@@ -72,26 +73,114 @@ pub fn WeatherDisplay(
     };
     let min_line_opacity: f64 = if theme == Theme::Light { 1.0 } else { 0.5 };
 
-    // ---- Hourly chart ----
-    #[allow(warnings)]
-    struct HourlyPoint {
-        x: f64,
-        y: f64,
-        index: usize,
-        icon: &'static str,
-        time: String,
-        temp: f64,
-        temp_str: String,
-        time_str: String,
+    // ---- Hourly: yesterday → day 5 ----
+    let mut selected_hourly_day = use_signal(|| 1_i32); // Default to today (index 1)
+
+    // Group by date, including yesterday and today
+    let mut hourly_by_day: Vec<Vec<&HourlyData>> = Vec::new();
+
+    // Add yesterday's data first
+    let yesterday_date = data.yesterday.date.clone();
+    let yesterday_data: Vec<HourlyData> = data
+        .hourly
+        .iter()
+        .filter(|h| h.date == yesterday_date)
+        .cloned()
+        .collect();
+    if !yesterday_data.is_empty() {
+        hourly_by_day.push(yesterday_data.iter().collect());
     }
 
-    let h_min_temp = data
-        .hourly
+    // Then group the remaining data by date
+    let mut groups: Vec<Vec<&HourlyData>> = Vec::new();
+    let mut current_date: Option<&str> = None;
+    let mut current_group = Vec::new();
+    for h in &data.hourly {
+        // Skip hours that belong to yesterday since we've already added them
+        if h.date == yesterday_date {
+            continue;
+        }
+
+        match current_date {
+            Some(d) if d == h.date => {}
+            _ => {
+                if !current_group.is_empty() {
+                    groups.push(current_group);
+                }
+                current_group = Vec::new();
+                current_date = Some(&h.date);
+            }
+        }
+        current_group.push(h);
+    }
+    if !current_group.is_empty() {
+        groups.push(current_group);
+    }
+
+    // Add today and future days, limiting to 6 days total (yesterday + 5 future days)
+    for group in groups {
+        hourly_by_day.push(group);
+    }
+    hourly_by_day.truncate(6);
+
+    let day_labels: Vec<String> = (0..6)
+        .map(|i| match i {
+            0 => {
+                if lang == Language::English {
+                    "Yesterday".to_string()
+                } else {
+                    "Вчера".to_string()
+                }
+            }
+            1 => {
+                if lang == Language::English {
+                    "Today".to_string()
+                } else {
+                    "Сегодня".to_string()
+                }
+            }
+            2 => {
+                if lang == Language::English {
+                    "Tomorrow".to_string()
+                } else {
+                    "Завтра".to_string()
+                }
+            }
+            3 => {
+                if lang == Language::English {
+                    "In 2 days".to_string()
+                } else {
+                    "Послезавтра".to_string()
+                }
+            }
+            4 => {
+                if lang == Language::English {
+                    "In 3 days".to_string()
+                } else {
+                    "Через 3 дня".to_string()
+                }
+            }
+            5 => {
+                if lang == Language::English {
+                    "In 4 days".to_string()
+                } else {
+                    "Через 4 дня".to_string()
+                }
+            }
+            _ => format!("+{}d", i + 1),
+        })
+        .collect();
+
+    let selected_day = selected_hourly_day() as usize;
+    let displayed_hours: Vec<&HourlyData> =
+        hourly_by_day.get(selected_day).cloned().unwrap_or_default();
+
+    // ---- Hourly chart data ----
+    let h_min_temp = displayed_hours
         .iter()
         .map(|h| h.temperature)
         .fold(f64::INFINITY, f64::min);
-    let h_max_temp = data
-        .hourly
+    let h_max_temp = displayed_hours
         .iter()
         .map(|h| h.temperature)
         .fold(f64::NEG_INFINITY, f64::max);
@@ -103,8 +192,8 @@ pub fn WeatherDisplay(
     let h_plot_width: f64 = h_view_width - 2.0 * h_padding;
     let h_plot_height: f64 = h_view_height - 2.0 * h_padding;
 
-    let h_step_x: f64 = if data.hourly.len() > 1 {
-        h_plot_width / (data.hourly.len() - 1) as f64
+    let h_step_x: f64 = if displayed_hours.len() > 1 {
+        h_plot_width / (displayed_hours.len() - 1) as f64
     } else {
         0.0
     };
@@ -113,8 +202,7 @@ pub fn WeatherDisplay(
         h_view_height - h_padding - ((t - h_min_temp) / h_temp_range) * h_plot_height
     };
 
-    let h_points_line: Vec<String> = data
-        .hourly
+    let h_points_line: Vec<String> = displayed_hours
         .iter()
         .enumerate()
         .map(|(i, h)| {
@@ -126,31 +214,157 @@ pub fn WeatherDisplay(
         })
         .collect();
 
-    let h_points: &'static [HourlyPoint] = Vec::leak(
-        data.hourly
-            .iter()
-            .enumerate()
-            .map(|(i, h)| {
-                let x = h_padding + h_step_x * i as f64;
-                let y = h_to_y(h.temperature);
-                let icon = condition_icon_from_text(&h.condition);
-                let temp_str = format!("{:.0}{}", h.temperature, temp_unit_str);
-                let time_str = h.time.clone();
-                HourlyPoint {
-                    x,
-                    y,
-                    index: i,
-                    icon,
-                    time: h.time.clone(),
-                    temp: h.temperature,
-                    temp_str,
-                    time_str,
-                }
-            })
-            .collect::<Vec<_>>(),
-    );
+    // Data for each point (owned)
+    struct HourlyPointOwned {
+        index: usize,
+        x: f64,
+        y: f64,
+        icon: &'static str,
+        temp_str: String,
+        time_str: String,
+    }
+
+    let h_points: Vec<HourlyPointOwned> = displayed_hours
+        .iter()
+        .enumerate()
+        .map(|(i, h)| {
+            let x = h_padding + h_step_x * i as f64;
+            let y = h_to_y(h.temperature);
+            let icon = condition_icon_from_text(&h.condition);
+            let temp_str = format!("{:.0}{}", h.temperature, temp_unit_str);
+            let time_str = h.time.clone();
+            HourlyPointOwned {
+                index: i,
+                x,
+                y,
+                icon,
+                temp_str,
+                time_str,
+            }
+        })
+        .collect();
 
     let mut h_hovered = use_signal(|| None::<usize>);
+
+    // Build hourly SVG children outside rsx! to avoid any borrows
+    let hourly_svg_children: Vec<VNode> = {
+        let mut children = Vec::new();
+        for p in &h_points {
+            let idx = p.index;
+            let x = p.x;
+            let y = p.y;
+            let icon = p.icon;
+            let temp_str = p.temp_str.clone();
+            let time_str = p.time_str.clone();
+
+            // circle
+            children.push(
+                rsx! {
+                    circle {
+                        cx: format!("{:.1}", x),
+                        cy: format!("{:.1}", y),
+                        r: if h_hovered() == Some(idx) { 7 } else { 5 },
+                        fill: max_line_color,
+                        stroke: "white",
+                        stroke_width: 1.5,
+                        class: "chart-point",
+                        onmouseenter: move |_| h_hovered.set(Some(idx)),
+                        onmouseleave: move |_| h_hovered.set(None),
+                    }
+                }
+                .unwrap(),
+            );
+
+            // icon text
+            children.push(
+                rsx! {
+                    text {
+                        x: format!("{:.1}", x),
+                        y: format!("{:.1}", y - 34.0),
+                        text_anchor: "middle",
+                        font_size: "20",
+                        fill: "white",
+                        stroke: "none",
+                        "{icon}"
+                    }
+                }
+                .unwrap(),
+            );
+
+            // temperature text
+            children.push(
+                rsx! {
+                    text {
+                        x: format!("{:.1}", x),
+                        y: format!("{:.1}", y - 16.0),
+                        text_anchor: "middle",
+                        font_size: "12",
+                        fill: label_color,
+                        stroke: "none",
+                        "{temp_str}"
+                    }
+                }
+                .unwrap(),
+            );
+
+            // time text
+            children.push(
+                rsx! {
+                    text {
+                        x: format!("{:.1}", x),
+                        y: format!("{:.0}", h_view_height - 8.0),
+                        text_anchor: "middle",
+                        font_size: "12",
+                        fill: "var(--muted, #ccc)",
+                        stroke: "none",
+                        "{time_str}"
+                    }
+                }
+                .unwrap(),
+            );
+        }
+        children
+    };
+
+    // Precompute tooltip VNode (unchanged)
+    let hourly_tooltip: Option<VNode> = h_hovered().and_then(|idx| {
+        let displayed_hour = displayed_hours.get(idx)?;
+        let p = h_points.get(idx)?;
+        let cond_text = translate_condition(&displayed_hour.condition, &lang);
+        let wind_str = format!(
+            "{}: {:.1} {}",
+            if lang == Language::English {
+                "Wind"
+            } else {
+                "Ветер"
+            },
+            displayed_hour.wind_speed,
+            wind_unit_str,
+        );
+        let tooltip_width = 130.0;
+        let half_width = tooltip_width / 2.0;
+        let x_ratio = p.x / h_view_width;
+        let offset = (x_ratio - 0.5) * 60.0;
+        let tooltip_x = (p.x - half_width + offset)
+            .max(0.0)
+            .min(h_view_width - tooltip_width);
+        Some(
+            rsx! {
+                foreignObject {
+                    x: format!("{:.1}", tooltip_x),
+                    y: format!("{:.1}", p.y - 100.0),
+                    width: format!("{:.0}", tooltip_width),
+                    height: "90",
+                    div { class: "chart-tooltip",
+                        div { "{p.icon}  {cond_text}" }
+                        div { "{p.temp_str}" }
+                        div { "{wind_str}" }
+                    }
+                }
+            }
+            .unwrap(),
+        )
+    });
 
     let hourly_chart: VNode = rsx! {
         svg {
@@ -165,85 +379,15 @@ pub fn WeatherDisplay(
                 stroke_linecap: "round",
                 points: h_points_line.join(" "),
             }
-            for p in h_points.iter() {
-                circle {
-                    cx: format!("{:.1}", p.x),
-                    cy: format!("{:.1}", p.y),
-                    r: if h_hovered() == Some(p.index) { 7 } else { 5 },
-                    fill: max_line_color,
-                    stroke: "white",
-                    stroke_width: 1.5,
-                    class: "chart-point",
-                    onmouseenter: move |_| h_hovered.set(Some(p.index)),
-                    onmouseleave: move |_| h_hovered.set(None),
-                }
-                text {
-                    x: format!("{:.1}", p.x),
-                    y: format!("{:.1}", p.y - 34.0),
-                    text_anchor: "middle",
-                    font_size: "20",
-                    fill: "white",
-                    stroke: "none",
-                    "{p.icon}"
-                }
-                text {
-                    x: format!("{:.1}", p.x),
-                    y: format!("{:.1}", p.y - 16.0),
-                    text_anchor: "middle",
-                    font_size: "12",
-                    fill: label_color,
-                    stroke: "none",
-                    "{p.temp_str}"
-                }
-                text {
-                    x: format!("{:.1}", p.x),
-                    y: format!("{:.0}", h_view_height - 8.0),
-                    text_anchor: "middle",
-                    font_size: "12",
-                    fill: "var(--muted, #ccc)",
-                    stroke: "none",
-                    "{p.time_str}"
-                }
+            for child in hourly_svg_children {
+                {child}
             }
-            // ---- Hourly tooltip ----
-            if let Some(idx) = h_hovered() {
-                if let Some(p) = h_points.get(idx) {
-                    {
-                        let cond_text = translate_condition(&data.hourly[idx].condition, &lang);
-                        let wind_str = format!(
-                            "{}: {:.1} {}",
-                            if lang == Language::English { "Wind" } else { "Ветер" },
-                            data.hourly[idx].wind_speed,
-                            wind_unit_str,
-                        );
-                        let tooltip_width = 130.0;
-                        let half_width = tooltip_width / 2.0;
-                        let x_ratio = p.x / h_view_width;
-                        let offset = (x_ratio - 0.5) * -120.0;
-                        let tooltip_x = (p.x - half_width + offset)
-                            .max(0.0)
-                            .min(h_view_width - tooltip_width);
-                        rsx! {
-                            foreignObject {
-                                x: format!("{:.1}", tooltip_x),
-                                y: format!("{:.1}", p.y - 150.0),
-                                width: format!("{:.0}", tooltip_width),
-                                height: "90",
-                                div { class: "chart-tooltip",
-                                    div { "{p.icon}  {cond_text}" }
-                                    div { "{p.temp_str}" }
-                                    div { "{wind_str}" }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
+            {hourly_tooltip}
         }
     }
     .unwrap();
 
-    // ---- Daily chart ----
+    // ---- Daily chart (same pattern) ----
     let mut chart_days: Vec<&DailyData> = Vec::with_capacity(1 + data.forecast.len());
     chart_days.push(&data.yesterday);
     for d in &data.forecast {
@@ -297,63 +441,231 @@ pub fn WeatherDisplay(
         })
         .collect();
 
-    #[allow(warnings)]
-    struct DailyPoint {
+    struct DailyPointOwned {
+        index: usize,
         x: f64,
         y_max: f64,
         y_min: f64,
-        index: usize,
         icon: &'static str,
+        max_temp_str: String,
+        min_temp_str: String,
         label: String,
+        condition: String,
         max_temp: f64,
         min_temp: f64,
         wind: f64,
-        condition: String,
-        date: String,
-        max_temp_str: String,
-        min_temp_str: String,
     }
 
-    let d_points: &'static [DailyPoint] = Vec::leak(
-        chart_days
-            .iter()
-            .enumerate()
-            .map(|(i, day)| {
-                let x: f64 = padding + step_x * i as f64;
-                let y_max: f64 = to_y(day.temperature_max);
-                let y_min: f64 = to_y(day.temperature_min);
-                let icon: &str = condition_icon_from_text(&day.condition);
-                let label: String = if i == 0 {
-                    if lang == Language::English {
-                        "Yesterday".to_string()
-                    } else {
-                        "Вчера".to_string()
-                    }
+    let d_points: Vec<DailyPointOwned> = chart_days
+        .iter()
+        .enumerate()
+        .map(|(i, day)| {
+            let x = padding + step_x * i as f64;
+            let y_max = to_y(day.temperature_max);
+            let y_min = to_y(day.temperature_min);
+            let icon = condition_icon_from_text(&day.condition);
+            let label = if i == 0 {
+                if lang == Language::English {
+                    "Yesterday".to_string()
                 } else {
-                    format_forecast_label(&day.date, i - 1, &lang)
-                };
-                let max_temp_str: String = format!("{:.0}{}", day.temperature_max, temp_unit_str);
-                let min_temp_str: String = format!("{:.0}{}", day.temperature_min, temp_unit_str);
-                DailyPoint {
-                    x,
-                    y_max,
-                    y_min,
-                    index: i,
-                    icon,
-                    label,
-                    max_temp: day.temperature_max,
-                    min_temp: day.temperature_min,
-                    wind: day.wind_speed_max,
-                    condition: day.condition.clone(),
-                    date: day.date.clone(),
-                    max_temp_str,
-                    min_temp_str,
+                    "Вчера".to_string()
                 }
-            })
-            .collect::<Vec<_>>(),
-    );
+            } else {
+                format_forecast_label(&day.date, i - 1, &lang)
+            };
+            let max_temp_str: String = format!("{:.0}{}", day.temperature_max, temp_unit_str);
+            let min_temp_str: String = format!("{:.0}{}", day.temperature_min, temp_unit_str);
+            DailyPointOwned {
+                index: i,
+                x,
+                y_max,
+                y_min,
+                icon,
+                max_temp_str,
+                min_temp_str,
+                label,
+                condition: day.condition.clone(),
+                max_temp: day.temperature_max,
+                min_temp: day.temperature_min,
+                wind: day.wind_speed_max,
+            }
+        })
+        .collect();
 
     let mut d_hovered = use_signal(|| None::<usize>);
+
+    // Daily SVG children
+    let daily_svg_children: Vec<VNode> = {
+        let mut children = Vec::new();
+        for p in &d_points {
+            let idx = p.index;
+            let x = p.x;
+            let y_max = p.y_max;
+            let y_min = p.y_min;
+            let icon = p.icon;
+            let max_temp_str = p.max_temp_str.clone();
+            let min_temp_str = p.min_temp_str.clone();
+            let label = p.label.clone();
+
+            // max circle
+            children.push(
+                rsx! {
+                    circle {
+                        cx: format!("{:.1}", x),
+                        cy: format!("{:.1}", y_max),
+                        r: if d_hovered() == Some(idx) { 7 } else { 5 },
+                        fill: point_fill_max,
+                        stroke: "white",
+                        stroke_opacity: if theme == Theme::Light { 1.0 } else { 0.0 },
+                        stroke_width: 1.5,
+                        class: "chart-point",
+                        onmouseenter: move |_| d_hovered.set(Some(idx)),
+                        onmouseleave: move |_| d_hovered.set(None),
+                    }
+                }
+                .unwrap(),
+            );
+
+            // min circle
+            children.push(
+                rsx! {
+                    circle {
+                        cx: format!("{:.1}", x),
+                        cy: format!("{:.1}", y_min),
+                        r: if d_hovered() == Some(idx) { 7 } else { 5 },
+                        fill: point_fill_min,
+                        stroke: "white",
+                        stroke_opacity: if theme == Theme::Light { 1.0 } else { 0.0 },
+                        stroke_width: 1.5,
+                        class: "chart-point",
+                        onmouseenter: move |_| d_hovered.set(Some(idx)),
+                        onmouseleave: move |_| d_hovered.set(None),
+                    }
+                }
+                .unwrap(),
+            );
+
+            // max temp text
+            children.push(
+                rsx! {
+                    text {
+                        x: format!("{:.1}", x),
+                        y: format!("{:.1}", y_max - 16.0),
+                        text_anchor: "middle",
+                        font_size: "12",
+                        fill: max_line_color,
+                        stroke: "none",
+                        "{max_temp_str}"
+                    }
+                }
+                .unwrap(),
+            );
+
+            // min temp text
+            children.push(
+                rsx! {
+                    text {
+                        x: format!("{:.1}", x),
+                        y: format!("{:.1}", y_min + 22.0),
+                        text_anchor: "middle",
+                        font_size: "12",
+                        fill: min_line_color,
+                        stroke: "none",
+                        "{min_temp_str}"
+                    }
+                }
+                .unwrap(),
+            );
+
+            // icon text
+            children.push(
+                rsx! {
+                    text {
+                        x: format!("{:.1}", x),
+                        y: format!("{:.1}", y_max - 34.0),
+                        text_anchor: "middle",
+                        font_size: "22",
+                        fill: "white",
+                        stroke: "none",
+                        "{icon}"
+                    }
+                }
+                .unwrap(),
+            );
+
+            // label text
+            children.push(
+                rsx! {
+                    text {
+                        x: format!("{:.1}", x),
+                        y: format!("{:.0}", chart_height - 8.0),
+                        text_anchor: "middle",
+                        font_size: "13",
+                        fill: "var(--muted, #ccc)",
+                        stroke: "none",
+                        "{label}"
+                    }
+                }
+                .unwrap(),
+            );
+        }
+        children
+    };
+
+    let daily_tooltip: Option<VNode> = d_hovered().and_then(|idx| {
+        let day = chart_days.get(idx)?;
+        let p = d_points.get(idx)?;
+        let cond_text = translate_condition(&day.condition, &lang);
+        let high_label = if lang == Language::English {
+            "Highest"
+        } else {
+            "Макс"
+        };
+        let low_label = if lang == Language::English {
+            "Lowest"
+        } else {
+            "Мин"
+        };
+        let high = format!(
+            "{}: {:.0}{}",
+            high_label, day.temperature_max, temp_unit_str
+        );
+        let low = format!("{}: {:.0}{}", low_label, day.temperature_min, temp_unit_str);
+        let wind = format!(
+            "{}: {:.1} {}",
+            if lang == Language::English {
+                "Wind"
+            } else {
+                "Ветер"
+            },
+            day.wind_speed_max,
+            wind_unit_str,
+        );
+        let tooltip_width = 140.0;
+        let half_width = tooltip_width / 2.0;
+        let x_ratio = p.x / chart_width;
+        let offset = (x_ratio - 0.5) * 60.0;
+        let tooltip_x = (p.x - half_width + offset)
+            .max(0.0)
+            .min(chart_width - tooltip_width);
+        Some(
+            rsx! {
+                foreignObject {
+                    x: format!("{:.1}", tooltip_x),
+                    y: format!("{:.1}", p.y_max - 100.0),
+                    width: format!("{:.0}", tooltip_width),
+                    height: "100",
+                    div { class: "chart-tooltip",
+                        div { "{p.icon}  {cond_text}" }
+                        div { "{high}" }
+                        div { "{low}" }
+                        div { "{wind}" }
+                    }
+                }
+            }
+            .unwrap(),
+        )
+    });
 
     let daily_chart: VNode = rsx! {
         svg {
@@ -377,109 +689,16 @@ pub fn WeatherDisplay(
                 stroke_linecap: "round",
                 points: min_points.join(" "),
             }
-            for p in d_points.iter() {
-                circle {
-                    cx: format!("{:.1}", p.x),
-                    cy: format!("{:.1}", p.y_max),
-                    r: if d_hovered() == Some(p.index) { 7 } else { 5 },
-                    fill: point_fill_max,
-                    stroke: "white",
-                    stroke_opacity: if theme == Theme::Light { 1.0 } else { 0.0 },
-                    stroke_width: 1.5,
-                    class: "chart-point",
-                    onmouseenter: move |_| d_hovered.set(Some(p.index)),
-                    onmouseleave: move |_| d_hovered.set(None),
-                }
-                circle {
-                    cx: format!("{:.1}", p.x),
-                    cy: format!("{:.1}", p.y_min),
-                    r: if d_hovered() == Some(p.index) { 7 } else { 5 },
-                    fill: point_fill_min,
-                    stroke: "white",
-                    stroke_opacity: if theme == Theme::Light { 1.0 } else { 0.0 },
-                    stroke_width: 1.5,
-                    class: "chart-point",
-                    onmouseenter: move |_| d_hovered.set(Some(p.index)),
-                    onmouseleave: move |_| d_hovered.set(None),
-                }
-                text {
-                    x: format!("{:.1}", p.x),
-                    y: format!("{:.1}", p.y_max - 16.0),
-                    text_anchor: "middle",
-                    font_size: "12",
-                    fill: max_line_color,
-                    stroke: "none",
-                    "{p.max_temp_str}"
-                }
-                text {
-                    x: format!("{:.1}", p.x),
-                    y: format!("{:.1}", p.y_min + 22.0),
-                    text_anchor: "middle",
-                    font_size: "12",
-                    fill: min_line_color,
-                    stroke: "none",
-                    "{p.min_temp_str}"
-                }
-                text {
-                    x: format!("{:.1}", p.x),
-                    y: format!("{:.1}", p.y_max - 34.0),
-                    text_anchor: "middle",
-                    font_size: "22",
-                    fill: "white",
-                    stroke: "none",
-                    "{p.icon}"
-                }
-                text {
-                    x: format!("{:.1}", p.x),
-                    y: format!("{:.0}", chart_height - 8.0),
-                    text_anchor: "middle",
-                    font_size: "13",
-                    fill: "var(--muted, #ccc)",
-                    stroke: "none",
-                    "{p.label}"
-                }
+            // iterate over the pre‑built daily children
+            for child in daily_svg_children {
+                {child}
             }
-            if let Some(idx) = d_hovered() {
-                if let Some(day) = chart_days.get(idx) {
-                    {
-                        let cond_text = translate_condition(&day.condition, &lang);
-                        let high_label = if lang == Language::English { "Highest" } else { "Макс" };
-                        let low_label = if lang == Language::English { "Lowest" } else { "Мин" };
-                        let high = format!(
-                            "{}: {:.0}{}",
-                            high_label,
-                            day.temperature_max,
-                            temp_unit_str,
-                        );
-                        let low = format!("{}: {:.0}{}", low_label, day.temperature_min, temp_unit_str);
-                        let wind = format!(
-                            "{}: {:.1} {}",
-                            if lang == Language::English { "Wind" } else { "Ветер" },
-                            day.wind_speed_max,
-                            wind_unit_str,
-                        );
-                        rsx! {
-                            foreignObject {
-                                x: format!("{:.1}", d_points[idx].x + 50.0),
-                                y: format!("{:.1}", d_points[idx].y_max - 150.0),
-                                width: "140",
-                                height: "100",
-                                div { class: "chart-tooltip",
-                                    div { "{d_points[idx].icon}  {cond_text}" }
-                                    div { "{high}" }
-                                    div { "{low}" }
-                                    div { "{wind}" }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
+            {daily_tooltip}
         }
     }
     .unwrap();
 
-    // ---- Astronomy section ----
+    // ---- Astronomy section (unchanged) ----
     let astronomy_section: Option<VNode> = data.forecast.first().map(|first_day| {
         let moon_phase = first_day
             .moon_phase_name
@@ -499,16 +718,15 @@ pub fn WeatherDisplay(
         let sunrise_time = format_time(first_day.sunrise.as_deref().unwrap_or("N/A"));
         let sunset_time = format_time(first_day.sunset.as_deref().unwrap_or("N/A"));
 
-        let day_length = if sunrise_time != "N/A" && sunset_time != "N/A" {
+        let day_length_raw = if sunrise_time != "N/A" && sunset_time != "N/A" {
             day_length_approx(&sunrise_time, &sunset_time)
         } else {
             "N/A".to_string()
         };
-
         let day_length_str = if lang == Language::English {
-            format!("Day length: {}", day_length)
+            format!("Day length: {}", day_length_raw)
         } else {
-            let localized = day_length.replace("h", "ч").replace("m", "мин");
+            let localized = day_length_raw.replace("h", "ч").replace("m", "мин");
             format!("Длительность дня: {}", localized)
         };
 
@@ -520,10 +738,8 @@ pub fn WeatherDisplay(
                 0
             }
         };
-
         let rise_min = to_min(&sunrise_time);
         let set_min = to_min(&sunset_time);
-
         let t_sunrise = rise_min as f64 / 1440.0;
         let t_sunset = set_min as f64 / 1440.0;
 
@@ -538,16 +754,14 @@ pub fn WeatherDisplay(
         };
         let y_for_t =
             |t: f64| -> f64 { (1.0 - t).powi(2) * y0 + 2.0 * (1.0 - t) * t * yc + t.powi(2) * y1 };
-
-        let sunrise_x = x_for_t(t_sunrise);
-        let sunset_x = x_for_t(t_sunset);
+        let sunrise_x: f64 = x_for_t(t_sunrise);
+        let sunset_x: f64 = x_for_t(t_sunset);
 
         let sun_pos: Option<(f64, f64)> = if sunrise_time != "N/A" && sunset_time != "N/A" {
-            let now_str = Local::now().format("%H:%M").to_string();
-            let now_min = to_min(&now_str);
-
-            let t = if now_min >= rise_min && now_min <= set_min {
-                let fraction = (now_min - rise_min) as f64 / (set_min - rise_min) as f64;
+            let now_str: String = Local::now().format("%H:%M").to_string();
+            let now_min: i32 = to_min(&now_str);
+            let t: f64 = if now_min >= rise_min && now_min <= set_min {
+                let fraction: f64 = (now_min - rise_min) as f64 / (set_min - rise_min) as f64;
                 t_sunrise + fraction * (t_sunset - t_sunrise)
             } else {
                 let total_night = 1440 - (set_min - rise_min);
@@ -561,9 +775,9 @@ pub fn WeatherDisplay(
                     t_sunset + 0.6 * fraction
                 }
             };
-            let t = t.max(-0.2).min(1.2);
-            let x = x_for_t(t);
-            let y = y_for_t(t);
+            let t: f64 = t.max(-0.2).min(1.2);
+            let x: f64 = x_for_t(t);
+            let y: f64 = y_for_t(t);
             Some((x, y))
         } else {
             None
@@ -579,7 +793,6 @@ pub fn WeatherDisplay(
         } else {
             format!("Закат: {}", sunset_time)
         };
-
         let path_d = format!("M 20,100 Q 150,{:.1} 280,100", yc);
 
         rsx! {
@@ -655,7 +868,12 @@ pub fn WeatherDisplay(
         .unwrap()
     });
 
-    // Main layout
+    let hourly_title = if lang == Language::English {
+        format!("Hourly Forecast for {}", day_labels[selected_day])
+    } else {
+        format!("Почасовой прогноз на {}", day_labels[selected_day])
+    };
+
     rsx! {
         div { class: "weather-container",
             div { class: "current-weather glass-card",
@@ -684,16 +902,36 @@ pub fn WeatherDisplay(
                     }
                 }
             }
+
             div { class: "forecast-section glass-card",
-                h3 {
-                    if lang == Language::English {
-                        "Hourly Forecast (24h)"
-                    } else {
-                        "Почасовой прогноз (24ч)"
+                div { class: "hourly-header",
+                    h3 { "{hourly_title}" }
+                    div { class: "hourly-nav",
+                        button {
+                            class: "icon-btn",
+                            disabled: selected_hourly_day() == 0,
+                            onclick: move |_| {
+                                if selected_hourly_day() > 0 {
+                                    selected_hourly_day -= 1;
+                                }
+                            },
+                            "◀"
+                        }
+                        button {
+                            class: "icon-btn",
+                            disabled: selected_hourly_day() == 5,
+                            onclick: move |_| {
+                                if selected_hourly_day() < 5 {
+                                    selected_hourly_day += 1;
+                                }
+                            },
+                            "▶"
+                        }
                     }
                 }
                 {hourly_chart}
             }
+
             div { class: "forecast-section glass-card",
                 h3 {
                     if lang == Language::English {
@@ -704,6 +942,7 @@ pub fn WeatherDisplay(
                 }
                 {daily_chart}
             }
+
             {astronomy_section}
         }
     }

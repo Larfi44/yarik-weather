@@ -18,7 +18,8 @@ pub struct CurrentData {
 
 #[derive(Debug, Serialize)]
 pub struct HourlyData {
-    pub time: String,
+    pub date: String, // NEW: "YYYY-MM-DD"
+    pub time: String, // "HH:MM"
     pub temperature: f64,
     pub wind_speed: f64,
     pub condition: String,

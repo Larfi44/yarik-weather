@@ -463,6 +463,24 @@ h1 {
     font-size: 0.8rem;
 }
 
+.hourly-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    /* title left, arrows right */
+    gap: 12px;
+    margin-bottom: 8px;
+}
+
+.hourly-nav {
+    display: flex;
+    gap: 8px;
+}
+
+.hourly-header h3 {
+    margin: 0;
+}
+
 html {
     font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     color: var(--text);

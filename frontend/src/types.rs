@@ -22,7 +22,8 @@ pub struct DailyData {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct HourlyData {
-    pub time: String,
+    pub date: String, // NEW: "2026-05-02"
+    pub time: String, // "14:00"
     pub temperature: f64,
     pub wind_speed: f64,
     pub condition: String,

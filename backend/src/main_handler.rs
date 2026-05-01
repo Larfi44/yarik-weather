@@ -35,29 +35,40 @@ pub async fn get_weather(Path(city): Path<String>) -> impl IntoResponse {
         condition: weather_description(forecast.current.weather_code).to_string(),
     };
 
-    // Hourly data for today (first 24 entries)
-    let hourly: Vec<HourlyData> = forecast
+    // Hourly with date+time, skipping today, max 6 days
+    let mut hourly: Vec<HourlyData> = Vec::new();
+    if let Some(today_date) = forecast
         .hourly
         .time
-        .iter()
-        .enumerate()
-        .take(24)
-        .map(|(i, time)| {
-            let time_str = time
+        .first()
+        .and_then(|t| t.split('T').next())
+    // "YYYY-MM-DD"
+    {
+        for (i, iso_time) in forecast.hourly.time.iter().enumerate() {
+            let date_part = iso_time.split('T').next().unwrap_or(iso_time);
+            if date_part == today_date {
+                continue; // ignore today
+            }
+            let time_part = iso_time
                 .split('T')
                 .nth(1)
-                .unwrap_or(time)
+                .unwrap_or(iso_time)
                 .chars()
                 .take(5)
                 .collect::<String>();
-            HourlyData {
-                time: time_str,
+            hourly.push(HourlyData {
+                date: date_part.to_string(),
+                time: time_part,
                 temperature: forecast.hourly.temperature_2m[i],
                 wind_speed: forecast.hourly.wind_speed_10m[i],
                 condition: weather_description(forecast.hourly.weather_code[i]).to_string(),
+            });
+            if hourly.len() == 6 * 24 {
+                // limit to 6 days
+                break;
             }
-        })
-        .collect();
+        }
+    }
 
     // Daily forecast with moon
     let mut forecast_days = Vec::with_capacity(forecast.daily.time.len());
