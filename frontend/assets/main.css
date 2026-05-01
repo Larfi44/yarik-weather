@@ -156,9 +156,9 @@ body {
     min-width: 150px;
     padding: 12px 16px;
     pointer-events: none;
-    position: fixed;
+    /* position: fixed; */
     text-align: center;
-    transform: translate(-50%, -110%);
+    /* transform: translate(-50%, -110%); */
     z-index: 1000;
 }
 

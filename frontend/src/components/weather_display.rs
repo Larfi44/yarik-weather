@@ -11,9 +11,8 @@ use crate::settings::WindUnit;
 use crate::types::DailyData;
 use crate::types::WeatherResponse;
 
-use dioxus::prelude::*;
-
 use chrono::Local;
+use dioxus::prelude::*;
 
 #[component]
 pub fn WeatherDisplay(
@@ -206,6 +205,40 @@ pub fn WeatherDisplay(
                     "{p.time_str}"
                 }
             }
+            // ---- Hourly tooltip ----
+            if let Some(idx) = h_hovered() {
+                if let Some(p) = h_points.get(idx) {
+                    {
+                        let cond_text = translate_condition(&data.hourly[idx].condition, &lang);
+                        let wind_str = format!(
+                            "{}: {:.1} {}",
+                            if lang == Language::English { "Wind" } else { "Ветер" },
+                            data.hourly[idx].wind_speed,
+                            wind_unit_str,
+                        );
+                        let tooltip_width = 130.0;
+                        let half_width = tooltip_width / 2.0;
+                        let x_ratio = p.x / h_view_width;
+                        let offset = (x_ratio - 0.5) * -120.0;
+                        let tooltip_x = (p.x - half_width + offset)
+                            .max(0.0)
+                            .min(h_view_width - tooltip_width);
+                        rsx! {
+                            foreignObject {
+                                x: format!("{:.1}", tooltip_x),
+                                y: format!("{:.1}", p.y - 150.0),
+                                width: format!("{:.0}", tooltip_width),
+                                height: "90",
+                                div { class: "chart-tooltip",
+                                    div { "{p.icon}  {cond_text}" }
+                                    div { "{p.temp_str}" }
+                                    div { "{wind_str}" }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
     .unwrap();
@@ -229,7 +262,7 @@ pub fn WeatherDisplay(
 
     let chart_width: f64 = 800.0;
     let chart_height: f64 = 300.0;
-    let padding: f64 = 60.0;
+    let padding = 60.0;
     let plot_width: f64 = chart_width - 2.0 * padding;
     let plot_height: f64 = chart_height - 2.0 * padding;
 
@@ -406,10 +439,47 @@ pub fn WeatherDisplay(
                     "{p.label}"
                 }
             }
+            if let Some(idx) = d_hovered() {
+                if let Some(day) = chart_days.get(idx) {
+                    {
+                        let cond_text = translate_condition(&day.condition, &lang);
+                        let high_label = if lang == Language::English { "Highest" } else { "Макс" };
+                        let low_label = if lang == Language::English { "Lowest" } else { "Мин" };
+                        let high = format!(
+                            "{}: {:.0}{}",
+                            high_label,
+                            day.temperature_max,
+                            temp_unit_str,
+                        );
+                        let low = format!("{}: {:.0}{}", low_label, day.temperature_min, temp_unit_str);
+                        let wind = format!(
+                            "{}: {:.1} {}",
+                            if lang == Language::English { "Wind" } else { "Ветер" },
+                            day.wind_speed_max,
+                            wind_unit_str,
+                        );
+                        rsx! {
+                            foreignObject {
+                                x: format!("{:.1}", d_points[idx].x + 50.0),
+                                y: format!("{:.1}", d_points[idx].y_max - 150.0),
+                                width: "140",
+                                height: "100",
+                                div { class: "chart-tooltip",
+                                    div { "{d_points[idx].icon}  {cond_text}" }
+                                    div { "{high}" }
+                                    div { "{low}" }
+                                    div { "{wind}" }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
     .unwrap();
 
+    // ---- Astronomy section ----
     let astronomy_section: Option<VNode> = data.forecast.first().map(|first_day| {
         let moon_phase = first_day
             .moon_phase_name
@@ -426,73 +496,80 @@ pub fn WeatherDisplay(
             format!("Освещённость: {}", moon_percent)
         };
 
-        // Sunrise / sunset times (already formatted as HH:MM)
         let sunrise_time = format_time(first_day.sunrise.as_deref().unwrap_or("N/A"));
         let sunset_time = format_time(first_day.sunset.as_deref().unwrap_or("N/A"));
 
-        // Day length using the correct HH:MM strings
         let day_length = if sunrise_time != "N/A" && sunset_time != "N/A" {
             day_length_approx(&sunrise_time, &sunset_time)
         } else {
             "N/A".to_string()
         };
+
         let day_length_str = if lang == Language::English {
             format!("Day length: {}", day_length)
         } else {
-            format!("Длительность дня: {}", day_length)
+            let localized = day_length.replace("h", "ч").replace("m", "мин");
+            format!("Длительность дня: {}", localized)
         };
 
-        // ---- Curve: M 20,100  Q 150,-120  280,100   (very tall, peaks at y = -70) ----
-        // Horizon at y = 30
-        // Intersection points computed from equation (same logic as before)
-        let t_sunrise: f64 = 0.2643;
-        let t_sunset: f64 = 0.7357;
+        let to_min = |s: &str| -> i32 {
+            let parts: Vec<&str> = s.split(':').collect();
+            if parts.len() == 2 {
+                parts[0].parse::<i32>().unwrap_or(0) * 60 + parts[1].parse::<i32>().unwrap_or(0)
+            } else {
+                0
+            }
+        };
+
+        let rise_min = to_min(&sunrise_time);
+        let set_min = to_min(&sunset_time);
+
+        let t_sunrise = rise_min as f64 / 1440.0;
+        let t_sunset = set_min as f64 / 1440.0;
+
+        let y0 = 100.0;
+        let y1 = 100.0;
+        let y_horizon = 30.0;
+        let yc = (y_horizon - (1.0 - t_sunrise).powi(2) * y0 - t_sunrise.powi(2) * y1)
+            / (2.0 * (1.0 - t_sunrise) * t_sunrise);
 
         let x_for_t = |t: f64| -> f64 {
             (1.0 - t).powi(2) * 20.0 + 2.0 * (1.0 - t) * t * 150.0 + t.powi(2) * 280.0
         };
+        let y_for_t =
+            |t: f64| -> f64 { (1.0 - t).powi(2) * y0 + 2.0 * (1.0 - t) * t * yc + t.powi(2) * y1 };
+
         let sunrise_x = x_for_t(t_sunrise);
         let sunset_x = x_for_t(t_sunset);
 
-        // Current sun position
         let sun_pos: Option<(f64, f64)> = if sunrise_time != "N/A" && sunset_time != "N/A" {
-            let to_min = |s: &str| -> i32 {
-                let parts: Vec<&str> = s.split(':').collect();
-                if parts.len() == 2 {
-                    parts[0].parse::<i32>().unwrap_or(0) * 60 + parts[1].parse::<i32>().unwrap_or(0)
-                } else {
-                    0
-                }
-            };
-            let rise_min = to_min(&sunrise_time);
-            let set_min = to_min(&sunset_time);
             let now_str = Local::now().format("%H:%M").to_string();
             let now_min = to_min(&now_str);
 
-            let t = if now_min < rise_min {
-                let minutes_before = rise_min - now_min;
-                let total_night = 1440 - (set_min - rise_min);
-                let fraction = minutes_before as f64 / total_night as f64;
-                t_sunrise - 0.5 * fraction
-            } else if now_min > set_min {
-                let minutes_after = now_min - set_min;
-                let total_night = 1440 - (set_min - rise_min);
-                let fraction = minutes_after as f64 / total_night as f64;
-                t_sunset + 0.5 * fraction
+            let t = if now_min >= rise_min && now_min <= set_min {
+                let fraction = (now_min - rise_min) as f64 / (set_min - rise_min) as f64;
+                t_sunrise + fraction * (t_sunset - t_sunrise)
             } else {
-                t_sunrise
-                    + (now_min - rise_min) as f64 / (set_min - rise_min) as f64
-                        * (t_sunset - t_sunrise)
+                let total_night = 1440 - (set_min - rise_min);
+                if now_min < rise_min {
+                    let minutes_before = rise_min - now_min;
+                    let fraction = minutes_before as f64 / total_night as f64;
+                    t_sunrise - 0.6 * fraction
+                } else {
+                    let minutes_after = now_min - set_min;
+                    let fraction = minutes_after as f64 / total_night as f64;
+                    t_sunset + 0.6 * fraction
+                }
             };
-            let t = t.max(-0.1).min(1.1);
+            let t = t.max(-0.2).min(1.2);
             let x = x_for_t(t);
-            let y = (1.0 - t).powi(2) * 100.0 + 2.0 * (1.0 - t) * t * (-120.0) + t.powi(2) * 100.0;
+            let y = y_for_t(t);
             Some((x, y))
         } else {
             None
         };
 
-        let sunrise_label: String = if lang == Language::English {
+        let sunrise_label = if lang == Language::English {
             format!("Sunrise: {}", sunrise_time)
         } else {
             format!("Восход: {}", sunrise_time)
@@ -502,6 +579,8 @@ pub fn WeatherDisplay(
         } else {
             format!("Закат: {}", sunset_time)
         };
+
+        let path_d = format!("M 20,100 Q 150,{:.1} 280,100", yc);
 
         rsx! {
             div { class: "astronomy-section glass-card",
@@ -515,10 +594,9 @@ pub fn WeatherDisplay(
                 div { class: "astronomy-grid",
                     div { class: "astro-card",
                         svg {
-                            view_box: "0 -50 300 120",
+                            view_box: "0 -60 300 130",
                             width: "100%",
                             style: "display: block;",
-                            // Horizon line at y = 30
                             line {
                                 x1: "20",
                                 y1: "30",
@@ -528,9 +606,8 @@ pub fn WeatherDisplay(
                                 stroke_width: 2,
                                 stroke_dasharray: "4 4",
                             }
-                            // Tall curved sun path
                             path {
-                                d: "M 20,100 Q 150,-120 280,100",
+                                d: "{path_d}",
                                 fill: "none",
                                 stroke: "var(--accent, orange)",
                                 stroke_width: 3,
@@ -552,7 +629,6 @@ pub fn WeatherDisplay(
                                 fill: "var(--text)",
                                 "{sunset_label}"
                             }
-                            // Sun emoji
                             if let Some((sun_x, sun_y)) = sun_pos {
                                 text {
                                     x: format!("{:.1}", sun_x),
