@@ -91,12 +91,10 @@ pub fn WeatherDisplay(
         hourly_by_day.push(yesterday_data.iter().collect());
     }
 
-    // Then group the remaining data by date
     let mut groups: Vec<Vec<&HourlyData>> = Vec::new();
     let mut current_date: Option<&str> = None;
     let mut current_group = Vec::new();
     for h in &data.hourly {
-        // Skip hours that belong to yesterday since we've already added them
         if h.date == yesterday_date {
             continue;
         }
@@ -117,7 +115,6 @@ pub fn WeatherDisplay(
         groups.push(current_group);
     }
 
-    // Add today and future days, limiting to 6 days total (yesterday + 5 future days)
     for group in groups {
         hourly_by_day.push(group);
     }
@@ -175,7 +172,6 @@ pub fn WeatherDisplay(
     let displayed_hours: Vec<&HourlyData> =
         hourly_by_day.get(selected_day).cloned().unwrap_or_default();
 
-    // ---- Hourly chart data ----
     // ---- Hourly chart data ----
     let h_min_temp = displayed_hours
         .iter()
@@ -332,8 +328,6 @@ pub fn WeatherDisplay(
         }
         children
     };
-
-    // Precompute tooltip VNode
     let hourly_tooltip: Option<VNode> = h_hovered().and_then(|idx| {
         let displayed_hour = displayed_hours.get(idx)?;
         let p = h_points.get(idx)?;
@@ -359,7 +353,7 @@ pub fn WeatherDisplay(
             rsx! {
                 foreignObject {
                     x: format!("{:.1}", tooltip_x),
-                    y: format!("{:.1}", p.y - 100.0),
+                    y: format!("{:.1}", p.y - 160.0),
                     width: format!("{:.0}", tooltip_width),
                     height: "90",
                     div { class: "chart-tooltip",
@@ -372,7 +366,6 @@ pub fn WeatherDisplay(
             .unwrap(),
         )
     });
-
     let hourly_chart: VNode = rsx! {
         svg {
             view_box: format!("0 0 {:.0} {:.0}", h_svg_width, h_view_height),
@@ -415,9 +408,7 @@ pub fn WeatherDisplay(
     let padding: f64 = 60.0;
     let plot_height: f64 = chart_height - 2.0 * padding;
 
-    // Fixed spacing between days (feel free to adjust 100 px)
     let step_x: f64 = if chart_days.len() > 1 { 100.0 } else { 0.0 };
-    // Total width
     let d_svg_width: f64 = if chart_days.len() < 2 {
         300.0
     } else {
@@ -469,11 +460,11 @@ pub fn WeatherDisplay(
         .iter()
         .enumerate()
         .map(|(i, day)| {
-            let x = padding + step_x * i as f64;
-            let y_max = to_y(day.temperature_max);
-            let y_min = to_y(day.temperature_min);
-            let icon = condition_icon_from_text(&day.condition);
-            let label = if i == 0 {
+            let x: f64 = padding + step_x * i as f64;
+            let y_max: f64 = to_y(day.temperature_max);
+            let y_min: f64 = to_y(day.temperature_min);
+            let icon: &str = condition_icon_from_text(&day.condition);
+            let label: String = if i == 0 {
                 if lang == Language::English {
                     "Yesterday".to_string()
                 } else {
@@ -505,16 +496,16 @@ pub fn WeatherDisplay(
 
     // Daily SVG children
     let daily_svg_children: Vec<VNode> = {
-        let mut children = Vec::new();
+        let mut children: Vec<VNode> = Vec::new();
         for p in &d_points {
-            let idx = p.index;
-            let x = p.x;
-            let y_max = p.y_max;
-            let y_min = p.y_min;
-            let icon = p.icon;
-            let max_temp_str = p.max_temp_str.clone();
-            let min_temp_str = p.min_temp_str.clone();
-            let label = p.label.clone();
+            let idx: usize = p.index;
+            let x: f64 = p.x;
+            let y_max: f64 = p.y_max;
+            let y_min: f64 = p.y_min;
+            let icon: &str = p.icon;
+            let max_temp_str: String = p.max_temp_str.clone();
+            let min_temp_str: String = p.min_temp_str.clone();
+            let label: String = p.label.clone();
 
             // max circle
             children.push(
@@ -622,25 +613,25 @@ pub fn WeatherDisplay(
     };
 
     let daily_tooltip: Option<VNode> = d_hovered().and_then(|idx| {
-        let day = chart_days.get(idx)?;
-        let p = d_points.get(idx)?;
-        let cond_text = translate_condition(&day.condition, &lang);
-        let high_label = if lang == Language::English {
+        let day: &&DailyData = chart_days.get(idx)?;
+        let p: &DailyPointOwned = d_points.get(idx)?;
+        let cond_text: String = translate_condition(&day.condition, &lang);
+        let high_label: &str = if lang == Language::English {
             "Highest"
         } else {
             "Макс"
         };
-        let low_label = if lang == Language::English {
+        let low_label: &str = if lang == Language::English {
             "Lowest"
         } else {
             "Мин"
         };
-        let high = format!(
+        let high: String = format!(
             "{}: {:.0}{}",
             high_label, day.temperature_max, temp_unit_str
         );
-        let low = format!("{}: {:.0}{}", low_label, day.temperature_min, temp_unit_str);
-        let wind = format!(
+        let low: String = format!("{}: {:.0}{}", low_label, day.temperature_min, temp_unit_str);
+        let wind: String = format!(
             "{}: {:.1} {}",
             if lang == Language::English {
                 "Wind"
@@ -650,18 +641,18 @@ pub fn WeatherDisplay(
             day.wind_speed_max,
             wind_unit_str,
         );
-        let tooltip_width = 140.0;
-        let half_width = tooltip_width / 2.0;
-        let x_ratio = p.x / d_svg_width;
-        let offset = (x_ratio - 0.5) * 60.0;
-        let tooltip_x = (p.x - half_width + offset)
+        let tooltip_width: f64 = 140.0;
+        let half_width: f64 = tooltip_width / 2.0;
+        let x_ratio: f64 = p.x / d_svg_width;
+        let offset: f64 = (x_ratio - 0.5) * 60.0;
+        let tooltip_x: f64 = (p.x - half_width + offset)
             .max(0.0)
             .min(d_svg_width - tooltip_width);
         Some(
             rsx! {
                 foreignObject {
                     x: format!("{:.1}", tooltip_x),
-                    y: format!("{:.1}", p.y_max - 100.0),
+                    y: format!("{:.1}", p.y_max - 150.0),
                     width: format!("{:.0}", tooltip_width),
                     height: "100",
                     div { class: "chart-tooltip",
@@ -706,35 +697,35 @@ pub fn WeatherDisplay(
     }
     .unwrap();
 
-    // ---- Astronomy section (unchanged) ----
+    // ---- Astronomy section ----
     let astronomy_section: Option<VNode> = data.forecast.first().map(|first_day| {
-        let moon_phase = first_day
+        let moon_phase: String = first_day
             .moon_phase_name
             .clone()
             .unwrap_or_else(|| "Unknown".to_string());
-        let moon_emoji = moon_emoji_from_phase(&moon_phase);
-        let moon_percent = first_day
+        let moon_emoji: &str = moon_emoji_from_phase(&moon_phase);
+        let moon_percent: String = first_day
             .moon_illumination
             .map(|v| format!("{:.0}%", v))
             .unwrap_or_else(na);
-        let moon_illum_str = if lang == Language::English {
+        let moon_illum_str: String = if lang == Language::English {
             format!("Illumination: {}", moon_percent)
         } else {
             format!("Освещённость: {}", moon_percent)
         };
 
-        let sunrise_time = format_time(first_day.sunrise.as_deref().unwrap_or("N/A"));
-        let sunset_time = format_time(first_day.sunset.as_deref().unwrap_or("N/A"));
+        let sunrise_time: String = format_time(first_day.sunrise.as_deref().unwrap_or("N/A"));
+        let sunset_time: String = format_time(first_day.sunset.as_deref().unwrap_or("N/A"));
 
-        let day_length_raw = if sunrise_time != "N/A" && sunset_time != "N/A" {
+        let day_length_raw: String = if sunrise_time != "N/A" && sunset_time != "N/A" {
             day_length_approx(&sunrise_time, &sunset_time)
         } else {
             "N/A".to_string()
         };
-        let day_length_str = if lang == Language::English {
+        let day_length_str: String = if lang == Language::English {
             format!("Day length: {}", day_length_raw)
         } else {
-            let localized = day_length_raw.replace("h", "ч").replace("m", "мин");
+            let localized: String = day_length_raw.replace("h", "ч").replace("m", "мин");
             format!("Длительность дня: {}", localized)
         };
 
@@ -746,15 +737,15 @@ pub fn WeatherDisplay(
                 0
             }
         };
-        let rise_min = to_min(&sunrise_time);
+        let rise_min: i32 = to_min(&sunrise_time);
         let set_min = to_min(&sunset_time);
-        let t_sunrise = rise_min as f64 / 1440.0;
-        let t_sunset = set_min as f64 / 1440.0;
+        let t_sunrise: f64 = rise_min as f64 / 1440.0;
+        let t_sunset: f64 = set_min as f64 / 1440.0;
 
-        let y0 = 100.0;
-        let y1 = 100.0;
-        let y_horizon = 30.0;
-        let yc = (y_horizon - (1.0 - t_sunrise).powi(2) * y0 - t_sunrise.powi(2) * y1)
+        let y0: f64 = 100.0;
+        let y1: f64 = 100.0;
+        let y_horizon: f64 = 30.0;
+        let yc: f64 = (y_horizon - (1.0 - t_sunrise).powi(2) * y0 - t_sunrise.powi(2) * y1)
             / (2.0 * (1.0 - t_sunrise) * t_sunrise);
 
         let x_for_t = |t: f64| -> f64 {
@@ -772,14 +763,14 @@ pub fn WeatherDisplay(
                 let fraction: f64 = (now_min - rise_min) as f64 / (set_min - rise_min) as f64;
                 t_sunrise + fraction * (t_sunset - t_sunrise)
             } else {
-                let total_night = 1440 - (set_min - rise_min);
+                let total_night: i32 = 1440 - (set_min - rise_min);
                 if now_min < rise_min {
-                    let minutes_before = rise_min - now_min;
-                    let fraction = minutes_before as f64 / total_night as f64;
+                    let minutes_before: i32 = rise_min - now_min;
+                    let fraction: f64 = minutes_before as f64 / total_night as f64;
                     t_sunrise - 0.6 * fraction
                 } else {
-                    let minutes_after = now_min - set_min;
-                    let fraction = minutes_after as f64 / total_night as f64;
+                    let minutes_after: i32 = now_min - set_min;
+                    let fraction: f64 = minutes_after as f64 / total_night as f64;
                     t_sunset + 0.6 * fraction
                 }
             };
@@ -791,17 +782,17 @@ pub fn WeatherDisplay(
             None
         };
 
-        let sunrise_label = if lang == Language::English {
+        let sunrise_label: String = if lang == Language::English {
             format!("Sunrise: {}", sunrise_time)
         } else {
             format!("Восход: {}", sunrise_time)
         };
-        let sunset_label = if lang == Language::English {
+        let sunset_label: String = if lang == Language::English {
             format!("Sunset: {}", sunset_time)
         } else {
             format!("Закат: {}", sunset_time)
         };
-        let path_d = format!("M 20,100 Q 150,{:.1} 280,100", yc);
+        let path_d: String = format!("M 20,100 Q 150,{:.1} 280,100", yc);
 
         rsx! {
             div { class: "astronomy-section glass-card",
@@ -876,7 +867,7 @@ pub fn WeatherDisplay(
         .unwrap()
     });
 
-    let hourly_title = if lang == Language::English {
+    let hourly_title: String = if lang == Language::English {
         format!("Hourly Forecast for {}", day_labels[selected_day])
     } else {
         format!("Почасовой прогноз на {}", day_labels[selected_day])
@@ -912,7 +903,6 @@ pub fn WeatherDisplay(
             }
 
             div { class: "forecast-section glass-card",
-                // Fixed header (doesn’t scroll)
                 div { class: "hourly-header",
                     div { style: "display: flex; align-items: center; gap: 12px; margin: 0 auto;",
                         h3 { "{hourly_title}" }
@@ -940,7 +930,6 @@ pub fn WeatherDisplay(
                         }
                     }
                 }
-                // Scrollable chart goes into its own wrapper
                 div { class: "chart-scroll", {hourly_chart} }
             }
             div { class: "forecast-section glass-card",

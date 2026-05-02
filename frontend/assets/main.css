@@ -824,23 +824,16 @@ select {
     }
 }
 
-/* ---- FINAL FIX: whole page scrolls, charts scroll horizontally, no black bars ---- */
-
-/* Allow the page to scroll vertically, but hide horizontal overflow */
 html,
 body {
     margin: 0 !important;
     padding: 0 !important;
     min-height: 100vh;
     overflow-x: hidden !important;
-    /* never scroll sideways */
     overflow-y: auto !important;
-    /* whole page scrolls */
     background: var(--bg1, #0b1220);
-    /* fallback dark */
 }
 
-/* The app shell should not restrict height – it can grow */
 .app-shell {
     min-height: 100vh;
     display: flex;
@@ -848,10 +841,8 @@ body {
     background: var(--bg-gradient);
     color: var(--text);
     overflow-x: hidden;
-    /* keep horizontal overflow clipped */
 }
 
-/* The main content area can now also grow freely, no extra scroll */
 .app-container {
     flex: 1;
     width: 100%;
@@ -859,48 +850,69 @@ body {
     margin: 0 auto;
     padding: 16px;
     box-sizing: border-box;
-    /* No overflow-y here – the body handles scrolling */
 }
 
-/* Forecast card – allow its child to overflow horizontally (for chart scroll) */
 .forecast-section {
     overflow-x: visible !important;
-    /* allow .chart-scroll to show its scrollbar */
-    overflow-y: hidden !important;
+    overflow-y: visible !important;
     width: 100% !important;
     box-sizing: border-box !important;
 }
 
-/* Sticky hourly header (fixed while chart scrolls) */
 .hourly-header {
     position: sticky !important;
     left: 0 !important;
-    z-index: 2 !important;
-    background: inherit !important;
+    z-index: 1 !important;
+    background: transparent !important;
+    backdrop-filter: none !important;
     padding-bottom: 8px;
     flex-shrink: 0 !important;
     width: 100% !important;
 }
 
-/* Horizontal scroll wrapper for charts */
 .chart-scroll {
+    position: relative !important;
+    z-index: 10 !important;
     overflow-x: auto !important;
-    overflow-y: hidden !important;
+    overflow-y: visible !important;
     width: 100% !important;
     -webkit-overflow-scrolling: touch;
 }
 
-/* Center the SVG when it fits, left‑align when it overflows */
 .chart-scroll svg {
     display: block;
     margin: 0 auto;
 }
 
-/* On larger screens, make forecast cards match the current‑weather width and centre them */
+.chart-tooltip {
+    position: relative !important;
+    z-index: 9999 !important;
+}
+
 @media (min-width: 768px) {
     .forecast-section {
         max-width: 1120px;
         margin-left: auto !important;
         margin-right: auto !important;
     }
+}
+
+.forecast-section {
+    position: relative !important;
+}
+
+.chart-tooltip-outer {
+    background: var(--card);
+    backdrop-filter: blur(12px);
+    border-radius: 14px;
+    border: 1px solid var(--border);
+    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.25);
+    color: var(--text);
+    padding: 10px 14px;
+    white-space: nowrap;
+    font-size: 14px;
+}
+
+.chart-scroll {
+    overflow: visible !important;
 }
