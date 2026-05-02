@@ -33,7 +33,11 @@ pub fn App() -> Element {
         {
             use gloo::utils::window;
             if let Ok(Some(media_query)) = window().match_media("(prefers-color-scheme: dark)") {
-                return if media_query.matches() { Theme::Dark } else { Theme::Light };
+                return if media_query.matches() {
+                    Theme::Dark
+                } else {
+                    Theme::Light
+                };
             }
         }
         Theme::Light
@@ -141,10 +145,20 @@ pub fn App() -> Element {
                             },
                             {theme_icon(settings().theme)}
                         }
-                        button {
-                            class: "icon-btn",
-                            onclick: move |_| show_downloads.set(true),
-                            "📥"
+                        // Download button – only on web
+                        {
+                            #[cfg(target_arch = "wasm32")]
+                            {
+                                rsx! {
+                                    button { class: "icon-btn", onclick: move |_| show_downloads.set(true), "📥" }
+                                }
+                            }
+                            #[cfg(not(target_arch = "wasm32"))]
+                            {
+                                rsx! {
+                                    Fragment {}
+                                }
+                            }
                         }
                         button {
                             class: "icon-btn",
@@ -227,11 +241,25 @@ pub fn App() -> Element {
                         }
                     }
                 }
-                if show_downloads() {
-                    DownloadModal {
-                        lang: settings().language.clone(),
-                        theme: resolved_theme,
-                        on_close: move |_| show_downloads.set(false),
+                // Download modal – only on web
+                {
+                    #[cfg(target_arch = "wasm32")]
+                    {
+                        rsx! {
+                            if show_downloads() {
+                                DownloadModal {
+                                    lang: settings().language.clone(),
+                                    theme: resolved_theme,
+                                    on_close: move |_| show_downloads.set(false),
+                                }
+                            }
+                        }
+                    }
+                    #[cfg(not(target_arch = "wasm32"))]
+                    {
+                        rsx! {
+                            Fragment {}
+                        }
                     }
                 }
                 if show_welcome() {

@@ -914,27 +914,29 @@ pub fn WeatherDisplay(
             div { class: "forecast-section glass-card",
                 // Fixed header (doesn’t scroll)
                 div { class: "hourly-header",
-                    h3 { "{hourly_title}" }
-                    div { class: "hourly-nav",
-                        button {
-                            class: "icon-btn",
-                            disabled: selected_hourly_day() == 0,
-                            onclick: move |_| {
-                                if selected_hourly_day() > 0 {
-                                    selected_hourly_day -= 1;
-                                }
-                            },
-                            "◀"
-                        }
-                        button {
-                            class: "icon-btn",
-                            disabled: selected_hourly_day() == 5,
-                            onclick: move |_| {
-                                if selected_hourly_day() < 5 {
-                                    selected_hourly_day += 1;
-                                }
-                            },
-                            "▶"
+                    div { style: "display: flex; align-items: center; gap: 12px; margin: 0 auto;",
+                        h3 { "{hourly_title}" }
+                        div { class: "hourly-nav",
+                            button {
+                                class: "icon-btn",
+                                disabled: selected_hourly_day() == 0,
+                                onclick: move |_| {
+                                    if selected_hourly_day() > 0 {
+                                        selected_hourly_day -= 1;
+                                    }
+                                },
+                                "◀"
+                            }
+                            button {
+                                class: "icon-btn",
+                                disabled: selected_hourly_day() == 5,
+                                onclick: move |_| {
+                                    if selected_hourly_day() < 5 {
+                                        selected_hourly_day += 1;
+                                    }
+                                },
+                                "▶"
+                            }
                         }
                     }
                 }
