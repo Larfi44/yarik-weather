@@ -176,6 +176,7 @@ pub fn WeatherDisplay(
         hourly_by_day.get(selected_day).cloned().unwrap_or_default();
 
     // ---- Hourly chart data ----
+    // ---- Hourly chart data ----
     let h_min_temp = displayed_hours
         .iter()
         .map(|h| h.temperature)
@@ -186,16 +187,22 @@ pub fn WeatherDisplay(
         .fold(f64::NEG_INFINITY, f64::max);
     let h_temp_range = (h_max_temp - h_min_temp).max(0.1);
 
-    let h_view_width: f64 = 1200.0;
     let h_view_height: f64 = 300.0;
     let h_padding: f64 = 60.0;
-    let h_plot_width: f64 = h_view_width - 2.0 * h_padding;
     let h_plot_height: f64 = h_view_height - 2.0 * h_padding;
 
+    // Determine spacing and total width dynamically
     let h_step_x: f64 = if displayed_hours.len() > 1 {
-        h_plot_width / (displayed_hours.len() - 1) as f64
+        // Make each point occupy a fixed comfortable width, e.g. 70 px
+        70.0
     } else {
         0.0
+    };
+    // Total SVG width = left padding + points * step + right padding
+    let h_svg_width: f64 = if displayed_hours.len() < 2 {
+        300.0 // fallback
+    } else {
+        h_padding + h_step_x * (displayed_hours.len() - 1) as f64 + h_padding
     };
 
     let h_to_y = |t: f64| -> f64 {
@@ -326,7 +333,7 @@ pub fn WeatherDisplay(
         children
     };
 
-    // Precompute tooltip VNode (unchanged)
+    // Precompute tooltip VNode
     let hourly_tooltip: Option<VNode> = h_hovered().and_then(|idx| {
         let displayed_hour = displayed_hours.get(idx)?;
         let p = h_points.get(idx)?;
@@ -343,11 +350,11 @@ pub fn WeatherDisplay(
         );
         let tooltip_width = 130.0;
         let half_width = tooltip_width / 2.0;
-        let x_ratio = p.x / h_view_width;
+        let x_ratio = p.x / h_svg_width;
         let offset = (x_ratio - 0.5) * 60.0;
         let tooltip_x = (p.x - half_width + offset)
             .max(0.0)
-            .min(h_view_width - tooltip_width);
+            .min(h_svg_width - tooltip_width);
         Some(
             rsx! {
                 foreignObject {
@@ -368,9 +375,9 @@ pub fn WeatherDisplay(
 
     let hourly_chart: VNode = rsx! {
         svg {
-            view_box: format!("0 0 {:.0} {:.0}", h_view_width, h_view_height),
-            width: "100%",
-            style: format!("overflow: visible; display: block; min-width: {}px;", h_view_width),
+            view_box: format!("0 0 {:.0} {:.0}", h_svg_width, h_view_height),
+            width: "{h_svg_width}px",
+            style: "display: block; overflow: visible;",
             polyline {
                 fill: "none",
                 stroke: max_line_color,
@@ -387,7 +394,7 @@ pub fn WeatherDisplay(
     }
     .unwrap();
 
-    // ---- Daily chart (same pattern) ----
+    // ---- Daily chart ----
     let mut chart_days: Vec<&DailyData> = Vec::with_capacity(1 + data.forecast.len());
     chart_days.push(&data.yesterday);
     for d in &data.forecast {
@@ -404,17 +411,19 @@ pub fn WeatherDisplay(
         .fold(f64::NEG_INFINITY, f64::max);
     let temp_range: f64 = (max_temp - min_temp).max(0.1);
 
-    let chart_width: f64 = 800.0;
     let chart_height: f64 = 300.0;
-    let padding = 60.0;
-    let plot_width: f64 = chart_width - 2.0 * padding;
+    let padding: f64 = 60.0;
     let plot_height: f64 = chart_height - 2.0 * padding;
 
-    let step_x: f64 = if chart_days.len() > 1 {
-        plot_width / (chart_days.len() - 1) as f64
+    // Fixed spacing between days (feel free to adjust 100 px)
+    let step_x: f64 = if chart_days.len() > 1 { 100.0 } else { 0.0 };
+    // Total width
+    let d_svg_width: f64 = if chart_days.len() < 2 {
+        300.0
     } else {
-        0.0
+        padding + step_x * (chart_days.len() - 1) as f64 + padding
     };
+
     let to_y =
         |t: f64| -> f64 { chart_height - padding - ((t - min_temp) / temp_range) * plot_height };
 
@@ -643,11 +652,11 @@ pub fn WeatherDisplay(
         );
         let tooltip_width = 140.0;
         let half_width = tooltip_width / 2.0;
-        let x_ratio = p.x / chart_width;
+        let x_ratio = p.x / d_svg_width;
         let offset = (x_ratio - 0.5) * 60.0;
         let tooltip_x = (p.x - half_width + offset)
             .max(0.0)
-            .min(chart_width - tooltip_width);
+            .min(d_svg_width - tooltip_width);
         Some(
             rsx! {
                 foreignObject {
@@ -669,9 +678,9 @@ pub fn WeatherDisplay(
 
     let daily_chart: VNode = rsx! {
         svg {
-            view_box: format!("0 0 {:.0} {:.0}", chart_width, chart_height),
-            width: "100%",
-            style: format!("overflow: visible; display: block; min-width: {}px;", chart_width),
+            view_box: format!("0 0 {:.0} {:.0}", d_svg_width, chart_height),
+            width: "{d_svg_width}px",
+            style: "display: block; overflow: visible;",
             polyline {
                 fill: "none",
                 stroke: max_line_color,
@@ -689,7 +698,6 @@ pub fn WeatherDisplay(
                 stroke_linecap: "round",
                 points: min_points.join(" "),
             }
-            // iterate over the pre‑built daily children
             for child in daily_svg_children {
                 {child}
             }
@@ -904,6 +912,7 @@ pub fn WeatherDisplay(
             }
 
             div { class: "forecast-section glass-card",
+                // Fixed header (doesn’t scroll)
                 div { class: "hourly-header",
                     h3 { "{hourly_title}" }
                     div { class: "hourly-nav",
@@ -929,9 +938,9 @@ pub fn WeatherDisplay(
                         }
                     }
                 }
-                {hourly_chart}
+                // Scrollable chart goes into its own wrapper
+                div { class: "chart-scroll", {hourly_chart} }
             }
-
             div { class: "forecast-section glass-card",
                 h3 {
                     if lang == Language::English {
@@ -940,7 +949,7 @@ pub fn WeatherDisplay(
                         "Прогноз на 7 дней"
                     }
                 }
-                {daily_chart}
+                div { class: "chart-scroll", {daily_chart} }
             }
 
             {astronomy_section}

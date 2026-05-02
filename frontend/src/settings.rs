@@ -3,7 +3,6 @@ use crate::assets::APPLE_DARK;
 use crate::assets::APPLE_LIGHT;
 
 use dioxus::prelude::*;
-use gloo_storage::{LocalStorage, Storage};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -64,12 +63,68 @@ pub fn apple_icon(theme: Theme) -> Asset {
     }
 }
 
+#[cfg(target_arch = "wasm32")]
+use gloo_storage::{LocalStorage, Storage};
+
+#[cfg(target_arch = "wasm32")]
 pub fn get_settings() -> UserSettings {
     LocalStorage::get(SETTINGS_KEY).unwrap_or_default()
 }
 
+#[cfg(target_arch = "wasm32")]
 pub fn save_settings(settings: &UserSettings) {
     let _ = LocalStorage::set(SETTINGS_KEY, settings);
+}
+
+#[cfg(all(not(target_arch = "wasm32"), not(target_os = "android")))]
+pub fn get_settings() -> UserSettings {
+    // For desktop, try to read from a file in the home directory
+    let settings_path = if let Some(home_dir) = ::dirs::config_dir() {
+        home_dir.join("yarik-weather/settings.json")
+    } else {
+        std::path::PathBuf::from("settings.json")
+    };
+
+    if settings_path.exists() {
+        if let Ok(content) = std::fs::read_to_string(&settings_path) {
+            if let Ok(settings) = serde_json::from_str(&content) {
+                return settings;
+            }
+        }
+    }
+    
+    // Return default settings if file doesn't exist or can't be read
+    UserSettings::default()
+}
+
+#[cfg(all(not(target_arch = "wasm32"), not(target_os = "android")))]
+pub fn save_settings(settings: &UserSettings) {
+    // For desktop, save to a file in the home directory
+    let settings_path = if let Some(home_dir) = ::dirs::config_dir() {
+        let config_dir = home_dir.join("yarik-weather");
+        // Create the directory if it doesn't exist
+        let _ = std::fs::create_dir_all(&config_dir);
+        config_dir.join("settings.json")
+    } else {
+        std::path::PathBuf::from("settings.json")
+    };
+
+    if let Ok(json) = serde_json::to_string_pretty(settings) {
+        let _ = std::fs::write(&settings_path, json);
+    }
+}
+
+#[cfg(target_os = "android")]
+pub fn get_settings() -> UserSettings {
+    // On Android, use default settings or implement Android-specific storage
+    UserSettings::default()
+}
+
+#[cfg(target_os = "android")]
+pub fn save_settings(settings: &UserSettings) {
+    // On Android, implement Android-specific storage
+    // For now, just log that we're trying to save
+    tracing::info!("Attempting to save settings on Android: {:?}", settings);
 }
 
 pub fn cycle_theme(theme: Theme) -> Theme {

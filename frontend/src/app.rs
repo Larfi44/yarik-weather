@@ -26,7 +26,20 @@ const FAVICON: Asset = asset!("/assets/favicon.svg");
 pub fn App() -> Element {
     let mut settings = use_signal(get_settings);
 
-    let mut system_theme = use_signal(|| Theme::Light);
+    // Initialize system theme based on platform
+    let mut system_theme = use_signal(|| {
+        // Default to light theme for desktop
+        #[cfg(target_arch = "wasm32")]
+        {
+            use gloo::utils::window;
+            if let Ok(Some(media_query)) = window().match_media("(prefers-color-scheme: dark)") {
+                return if media_query.matches() { Theme::Dark } else { Theme::Light };
+            }
+        }
+        Theme::Light
+    });
+
+    // Update system theme when media query changes (web only)
     use_effect(move || {
         #[cfg(target_arch = "wasm32")]
         {

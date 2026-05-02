@@ -211,6 +211,15 @@ pub fn month_name_ru(month: u32) -> &'static str {
 }
 
 pub fn open_link(url: &str) {
-    use gloo_utils::window;
-    let _ = window().open_with_url_and_target(url, "_blank");
+    #[cfg(target_arch = "wasm32")]
+    {
+        use gloo_utils::window;
+        let _ = window().open_with_url_and_target(url, "_blank");
+    }
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        // For desktop, we'll need to use a different approach
+        // This is a placeholder - you might want to use a crate like "open" for desktop
+        let _ = std::process::Command::new("open").arg(url).spawn();
+    }
 }
