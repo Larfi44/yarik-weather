@@ -396,9 +396,7 @@ body {
     display: flex;
     flex-direction: column;
     overflow-x: visible;
-    /* allow horizontal scroll overflow */
     overflow-y: hidden;
-    /* keep vertical overflow hidden */
     padding: 20px 20px 24px 20px;
     text-align: center;
     width: 100%;
@@ -852,12 +850,12 @@ body {
     box-sizing: border-box;
 }
 
-.forecast-section {
+/* .forecast-section {
     overflow-x: visible !important;
     overflow-y: visible !important;
     width: 100% !important;
     box-sizing: border-box !important;
-}
+} */
 
 .hourly-header {
     position: sticky !important;

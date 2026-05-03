@@ -5,9 +5,9 @@ Thumbs.db
 # IDE files
 .vscode/
 .idea/
+.gigaide
 *.swp
 *.swo
-*~
 
 # Backend (Rust)
 backend/target/
