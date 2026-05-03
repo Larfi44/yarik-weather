@@ -44,10 +44,10 @@ pub fn download_description(os: DownloadOs, lang: &Language) -> &'static str {
 
 pub fn download_url(os: DownloadOs) -> &'static str {
     match os {
-        DownloadOs::Android => "/downloads/YarikWeather-Android.apk",
-        DownloadOs::Windows => "/downloads/YarikWeather-Windows.exe",
-        DownloadOs::MacOS => "/downloads/YarikWeather-MacOS.dmg",
-        DownloadOs::Linux => "/downloads/YarikWeather-Linux.AppImage",
+        DownloadOs::Android => "../../downloads/YarikWeather-Android.apk",
+        DownloadOs::Windows => "../../downloads/YarikWeather-Windows.exe",
+        DownloadOs::MacOS => "../../downloads/YarikWeather-MacOS.dmg",
+        DownloadOs::Linux => "../../downloads/YarikWeather-Linux.deb",
     }
 }
 

@@ -12,7 +12,7 @@ use crate::utils::weather_description;
 use axum::{Router, routing::get};
 use tower_http::cors::{Any, CorsLayer};
 
-const PORT: u16 = 3000;
+const PORT: u16 = 8080;
 
 #[tokio::main]
 async fn main() {

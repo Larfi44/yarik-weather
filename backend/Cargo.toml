@@ -14,3 +14,6 @@ urlencoding = "2.1.3"
 tower-http = { version = "0.6", features = ["cors"] }
 watch = "0.2.3"
 
+[[bin]]
+name = "yarik-weather"
+path = "src/main.rs"
