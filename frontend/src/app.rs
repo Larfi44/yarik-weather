@@ -1,6 +1,7 @@
 #![allow(warnings)]
 
 use crate::api::fetch_weather;
+#[cfg(target_arch = "wasm32")]
 use crate::components::download_modal::DownloadModal;
 use crate::components::search_bar::SearchBar;
 use crate::components::settings_modal::SettingsModal;
@@ -21,14 +22,21 @@ use dioxus::prelude::*;
 
 static CSS: Asset = asset!("/assets/main.css");
 const FAVICON: Asset = asset!("/assets/favicon.svg");
+fn favicon_data_url() -> String {
+    let svg = include_str!("../assets/favicon.svg");
+    format!("data:image/svg+xml;base64,{}", base64_encode(svg))
+}
+
+fn base64_encode(s: &str) -> String {
+    use base64::{engine::general_purpose, Engine as _};
+    general_purpose::STANDARD.encode(s)
+}
 
 #[component]
 pub fn App() -> Element {
     let mut settings = use_signal(get_settings);
 
-    // Initialize system theme based on platform
     let mut system_theme = use_signal(|| {
-        // Default to light theme for desktop
         #[cfg(target_arch = "wasm32")]
         {
             use gloo::utils::window;
@@ -131,7 +139,7 @@ pub fn App() -> Element {
             div { class: "app-container",
                 div { class: "header glass-card",
                     div { class: "brand",
-                        img { src: FAVICON, class: "header-icon" }
+                        img { src: "{favicon_data_url()}", class: "header-icon" }
                         h1 { "Yarik Weather" }
                     }
                     div { class: "header-buttons",
