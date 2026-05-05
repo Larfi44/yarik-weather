@@ -7,7 +7,7 @@ use crate::types::WeatherResponse;
 #[cfg(target_arch = "wasm32")]
 use gloo_net::http::Request;
 
-pub const API_URL: &str = "http://192.168.1.73:3000/get_weather";
+pub const API_URL: &str = "https://functions.yandexcloud.net/d4ejjs1qt2b6v625aknb?city";
 pub const SETTINGS_KEY: &str = "weather_settings";
 
 pub async fn fetch_weather(
@@ -15,7 +15,7 @@ pub async fn fetch_weather(
     temp_unit: TempUnit,
     wind_unit: WindUnit,
 ) -> Result<WeatherResponse, String> {
-    let url = format!("{}/{}", API_URL, urlencoding::encode(city));
+    let url = format!("{}={}", API_URL, urlencoding::encode(city));
 
     #[cfg(target_arch = "wasm32")]
     {

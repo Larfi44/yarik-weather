@@ -78,7 +78,6 @@ pub fn save_settings(settings: &UserSettings) {
 
 #[cfg(all(not(target_arch = "wasm32"), not(target_os = "android")))]
 pub fn get_settings() -> UserSettings {
-    // For desktop, try to read from a file in the home directory
     let settings_path = if let Some(home_dir) = ::dirs::config_dir() {
         home_dir.join("yarik-weather/settings.json")
     } else {
@@ -92,17 +91,14 @@ pub fn get_settings() -> UserSettings {
             }
         }
     }
-    
-    // Return default settings if file doesn't exist or can't be read
+
     UserSettings::default()
 }
 
 #[cfg(all(not(target_arch = "wasm32"), not(target_os = "android")))]
 pub fn save_settings(settings: &UserSettings) {
-    // For desktop, save to a file in the home directory
     let settings_path = if let Some(home_dir) = ::dirs::config_dir() {
         let config_dir = home_dir.join("yarik-weather");
-        // Create the directory if it doesn't exist
         let _ = std::fs::create_dir_all(&config_dir);
         config_dir.join("settings.json")
     } else {
@@ -116,14 +112,11 @@ pub fn save_settings(settings: &UserSettings) {
 
 #[cfg(target_os = "android")]
 pub fn get_settings() -> UserSettings {
-    // On Android, use default settings or implement Android-specific storage
     UserSettings::default()
 }
 
 #[cfg(target_os = "android")]
 pub fn save_settings(settings: &UserSettings) {
-    // On Android, implement Android-specific storage
-    // For now, just log that we're trying to save
     tracing::info!("Attempting to save settings on Android: {:?}", settings);
 }
 
