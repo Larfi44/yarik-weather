@@ -36,16 +36,9 @@ cat > YarikWeather.app/Contents/Info.plist << 'ENDPLIST'
 ENDPLIST
 
 xattr -cr YarikWeather.app 2>/dev/null || true
-create-dmg \
-  --volname "YarikWeather" \
-  --window-pos 200 120 \
-  --window-size 800 400 \
-  --icon-size 100 \
-  --icon "YarikWeather.app" 200 190 \
-  --hide-extension "YarikWeather.app" \
-  --app-drop-link 600 185 \
-  "YarikWeather-MacOS.dmg" \
-  YarikWeather.app
+
+# Create DMG without Finder customization (reliable, no AppleScript)
+hdiutil create -volname "YarikWeather" -srcfolder YarikWeather.app -ov -format UDZO YarikWeather-MacOS.dmg
 echo "macOS DMG done"
 
 # ========== Windows ==========

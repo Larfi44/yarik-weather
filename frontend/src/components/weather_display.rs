@@ -1,9 +1,11 @@
 use crate::helpers::condition_icon_from_text;
 use crate::helpers::convert_pressure;
 use crate::helpers::convert_temp;
+use crate::helpers::convert_wind; // <-- added for wind conversion
 use crate::helpers::format_forecast_label;
 use crate::helpers::format_time;
 use crate::helpers::humidity_category;
+use crate::helpers::is_coastal_city;
 use crate::helpers::moon_emoji_from_phase;
 use crate::helpers::pressure_category;
 use crate::helpers::translate_category;
@@ -91,9 +93,8 @@ pub fn WeatherDisplay(
     let min_line_opacity: f64 = if theme == Theme::Light { 1.0 } else { 0.5 };
 
     // ---- Hourly: yesterday → day 5 ----
-    let mut selected_hourly_day = use_signal(|| 1_i32); // Default to today (index 1)
+    let mut selected_hourly_day = use_signal(|| 1_i32);
 
-    // Group by date, including yesterday and today
     let mut hourly_by_day: Vec<Vec<&HourlyData>> = Vec::new();
 
     // Add yesterday's data first
@@ -115,7 +116,6 @@ pub fn WeatherDisplay(
         if h.date == yesterday_date {
             continue;
         }
-
         match current_date {
             Some(d) if d == h.date => {}
             _ => {
@@ -141,44 +141,44 @@ pub fn WeatherDisplay(
         .map(|i| match i {
             0 => {
                 if lang == Language::English {
-                    "Yesterday".to_string()
+                    "Yesterday".into()
                 } else {
-                    "Вчера".to_string()
+                    "Вчера".into()
                 }
             }
             1 => {
                 if lang == Language::English {
-                    "Today".to_string()
+                    "Today".into()
                 } else {
-                    "Сегодня".to_string()
+                    "Сегодня".into()
                 }
             }
             2 => {
                 if lang == Language::English {
-                    "Tomorrow".to_string()
+                    "Tomorrow".into()
                 } else {
-                    "Завтра".to_string()
+                    "Завтра".into()
                 }
             }
             3 => {
                 if lang == Language::English {
-                    "In 2 days".to_string()
+                    "In 2 days".into()
                 } else {
-                    "Послезавтра".to_string()
+                    "Послезавтра".into()
                 }
             }
             4 => {
                 if lang == Language::English {
-                    "In 3 days".to_string()
+                    "In 3 days".into()
                 } else {
-                    "Через 3 дня".to_string()
+                    "Через 3 дня".into()
                 }
             }
             5 => {
                 if lang == Language::English {
-                    "In 4 days".to_string()
+                    "In 4 days".into()
                 } else {
-                    "Через 4 дня".to_string()
+                    "Через 4 дня".into()
                 }
             }
             _ => format!("+{}d", i + 1),
@@ -204,16 +204,9 @@ pub fn WeatherDisplay(
     let h_padding: f64 = 60.0;
     let h_plot_height: f64 = h_view_height - 2.0 * h_padding;
 
-    // Determine spacing and total width dynamically
-    let h_step_x: f64 = if displayed_hours.len() > 1 {
-        // Make each point occupy a fixed comfortable width, e.g. 70 px
-        70.0
-    } else {
-        0.0
-    };
-    // Total SVG width = left padding + points * step + right padding
+    let h_step_x: f64 = if displayed_hours.len() > 1 { 70.0 } else { 0.0 };
     let h_svg_width: f64 = if displayed_hours.len() < 2 {
-        300.0 // fallback
+        300.0
     } else {
         h_padding + h_step_x * (displayed_hours.len() - 1) as f64 + h_padding
     };
@@ -234,7 +227,6 @@ pub fn WeatherDisplay(
         })
         .collect();
 
-    // Data for each point (owned)
     struct HourlyPointOwned {
         index: usize,
         x: f64,
@@ -251,7 +243,12 @@ pub fn WeatherDisplay(
             let x = h_padding + h_step_x * i as f64;
             let y = h_to_y(h.temperature);
             let icon = condition_icon_from_text(&h.condition);
-            let temp_str = format!("{:.0}{}", h.temperature, temp_unit_str);
+            // Convert temperature for display
+            let temp_str = format!(
+                "{:.0}{}",
+                convert_temp(h.temperature, &temp_unit),
+                temp_unit_str
+            );
             let time_str = h.time.clone();
             HourlyPointOwned {
                 index: i,
@@ -266,7 +263,6 @@ pub fn WeatherDisplay(
 
     let mut h_hovered = use_signal(|| None::<usize>);
 
-    // Build hourly SVG children outside rsx! to avoid any borrows
     let hourly_svg_children: Vec<VNode> = {
         let mut children = Vec::new();
         for p in &h_points {
@@ -277,7 +273,6 @@ pub fn WeatherDisplay(
             let temp_str = p.temp_str.clone();
             let time_str = p.time_str.clone();
 
-            // circle
             children.push(
                 rsx! {
                     circle {
@@ -295,7 +290,6 @@ pub fn WeatherDisplay(
                 .unwrap(),
             );
 
-            // icon text
             children.push(
                 rsx! {
                     text {
@@ -311,7 +305,6 @@ pub fn WeatherDisplay(
                 .unwrap(),
             );
 
-            // temperature text
             children.push(
                 rsx! {
                     text {
@@ -327,7 +320,6 @@ pub fn WeatherDisplay(
                 .unwrap(),
             );
 
-            // time text
             children.push(
                 rsx! {
                     text {
@@ -352,8 +344,8 @@ pub fn WeatherDisplay(
         let p = h_points.get(idx)?;
         let cond_text = translate_condition(&displayed_hour.condition, &lang);
 
-        let wind_val = displayed_hour.wind_speed;
-        let wind_cat = wind_category(wind_val);
+        let wind_val = convert_wind(displayed_hour.wind_speed, &wind_unit);
+        let wind_cat = wind_category(displayed_hour.wind_speed);
         let wind_str = format!(
             "{}: {:.1} {} ({})",
             if lang == Language::English {
@@ -397,18 +389,6 @@ pub fn WeatherDisplay(
         );
 
         let mut sea_str = String::new();
-        if let Some(st) = displayed_hour.sea_temperature {
-            sea_str = format!(
-                "{}: {:.1}{}",
-                if lang == Language::English {
-                    "Sea"
-                } else {
-                    "Море"
-                },
-                convert_temp(st, &temp_unit),
-                temp_unit_str
-            );
-        }
 
         let tooltip_width = 160.0;
         let tooltip_height = 160.0;
@@ -419,6 +399,7 @@ pub fn WeatherDisplay(
         } else {
             (p.x - tooltip_width - offset, p.y - tooltip_height / 1.5)
         };
+
         Some(
             rsx! {
                 foreignObject {
@@ -543,15 +524,24 @@ pub fn WeatherDisplay(
             let icon: &str = condition_icon_from_text(&day.condition);
             let label: String = if i == 0 {
                 if lang == Language::English {
-                    "Yesterday".to_string()
+                    "Yesterday".into()
                 } else {
-                    "Вчера".to_string()
+                    "Вчера".into()
                 }
             } else {
                 format_forecast_label(&day.date, i - 1, &lang)
             };
-            let max_temp_str: String = format!("{:.0}{}", day.temperature_max, temp_unit_str);
-            let min_temp_str: String = format!("{:.0}{}", day.temperature_min, temp_unit_str);
+            // Convert temperature for display
+            let max_temp_str: String = format!(
+                "{:.0}{}",
+                convert_temp(day.temperature_max, &temp_unit),
+                temp_unit_str
+            );
+            let min_temp_str: String = format!(
+                "{:.0}{}",
+                convert_temp(day.temperature_min, &temp_unit),
+                temp_unit_str
+            );
             DailyPointOwned {
                 index: i,
                 x,
@@ -571,7 +561,6 @@ pub fn WeatherDisplay(
 
     let mut d_hovered = use_signal(|| None::<usize>);
 
-    // Daily SVG children (unchanged)
     let daily_svg_children: Vec<VNode> = {
         let mut children: Vec<VNode> = Vec::new();
         for p in &d_points {
@@ -584,7 +573,6 @@ pub fn WeatherDisplay(
             let min_temp_str: String = p.min_temp_str.clone();
             let label: String = p.label.clone();
 
-            // max circle
             children.push(
                 rsx! {
                     circle {
@@ -603,7 +591,6 @@ pub fn WeatherDisplay(
                 .unwrap(),
             );
 
-            // min circle
             children.push(
                 rsx! {
                     circle {
@@ -622,7 +609,6 @@ pub fn WeatherDisplay(
                 .unwrap(),
             );
 
-            // max temp text
             children.push(
                 rsx! {
                     text {
@@ -638,7 +624,6 @@ pub fn WeatherDisplay(
                 .unwrap(),
             );
 
-            // min temp text
             children.push(
                 rsx! {
                     text {
@@ -654,7 +639,6 @@ pub fn WeatherDisplay(
                 .unwrap(),
             );
 
-            // icon text
             children.push(
                 rsx! {
                     text {
@@ -670,7 +654,6 @@ pub fn WeatherDisplay(
                 .unwrap(),
             );
 
-            // label text
             children.push(
                 rsx! {
                     text {
@@ -689,7 +672,7 @@ pub fn WeatherDisplay(
         children
     };
 
-    // Daily tooltip
+    // Daily tooltip (with emojis and side positioning)
     let daily_tooltip: Option<VNode> = d_hovered().and_then(|idx| {
         let day: &&DailyData = chart_days.get(idx)?;
         let p: &DailyPointOwned = d_points.get(idx)?;
@@ -704,21 +687,17 @@ pub fn WeatherDisplay(
         } else {
             "Мин"
         };
-        let high: String = format!(
-            "{}: {:.0}{}",
-            high_label, day.temperature_max, temp_unit_str
-        );
-        let low: String = format!("{}: {:.0}{}", low_label, day.temperature_min, temp_unit_str);
 
+        let wind_val = convert_wind(day.wind_speed_max, &wind_unit);
         let wind_cat = wind_category(day.wind_speed_max);
-        let wind: String = format!(
+        let wind_str = format!(
             "{}: {:.1} {} ({})",
             if lang == Language::English {
                 "Wind"
             } else {
                 "Ветер"
             },
-            day.wind_speed_max,
+            wind_val,
             wind_unit_str,
             translate_category(wind_cat, &lang)
         );
@@ -740,6 +719,17 @@ pub fn WeatherDisplay(
             translate_category(uv_category(day.uv_index_max), &lang)
         );
 
+        let high_str = format!(
+            "{}{}",
+            convert_temp(day.temperature_max, &temp_unit),
+            temp_unit_str
+        );
+        let low_str = format!(
+            "{}{}",
+            convert_temp(day.temperature_min, &temp_unit),
+            temp_unit_str
+        );
+
         let tooltip_width = 180.0;
         let tooltip_height = 110.0;
         let offset = 15.0;
@@ -748,6 +738,10 @@ pub fn WeatherDisplay(
         } else {
             (p.x - tooltip_width - offset, p.y_max - tooltip_height / 1.5)
         };
+
+        let high_line = format!("{}: {}", high_label, high_str);
+        let low_line = format!("{}: {}", low_label, low_str);
+
         Some(
             rsx! {
                 foreignObject {
@@ -757,9 +751,9 @@ pub fn WeatherDisplay(
                     height: format!("{:.0}", tooltip_height),
                     div { class: "chart-tooltip",
                         div { "{p.icon}  {cond_text}" }
-                        div { "{high}" }
-                        div { "{low}" }
-                        div { "💨 {wind}" }
+                        div { "{high_line}" }
+                        div { "{low_line}" }
+                        div { "💨 {wind_str}" }
                         div { "💧 {humidity_range}" }
                         div { "☀️ {uv_max_str}" }
                     }
@@ -983,7 +977,13 @@ pub fn WeatherDisplay(
                     h2 { "{data.city}" }
                 }
                 div { class: "temp-large",
-                    {format!("{:.1}{}", data.current.temperature, temp_unit_str)}
+                    {
+                        format!(
+                            "{:.1}{}",
+                            convert_temp(data.current.temperature, &temp_unit),
+                            temp_unit_str,
+                        )
+                    }
                 }
                 div { class: "condition-line",
                     span { class: "condition-icon", "{condition_icon_str}" }
@@ -992,20 +992,19 @@ pub fn WeatherDisplay(
                     }
                 }
                 div { class: "weather-details",
-                    // Wind with category
                     p {
                         {
+                            let wind_val = convert_wind(data.current.wind_speed, &wind_unit);
                             let wind_cat = wind_category(data.current.wind_speed);
                             format!(
                                 "💨 {}: {:.1} {} ({})",
                                 if lang == Language::English { "Wind" } else { "Ветер" },
-                                data.current.wind_speed,
+                                wind_val,
                                 wind_unit_str,
                                 translate_category(wind_cat, &lang),
                             )
                         }
                     }
-                    // Humidity with category
                     p {
                         {
                             let hum_cat = humidity_category(data.current.humidity);
@@ -1017,7 +1016,6 @@ pub fn WeatherDisplay(
                             )
                         }
                     }
-                    // Pressure converted and with category
                     p {
                         {
                             let press_val = convert_pressure(data.current.pressure, &pressure_unit);
@@ -1031,7 +1029,6 @@ pub fn WeatherDisplay(
                             )
                         }
                     }
-                    // UV Index with category
                     p {
                         {
                             let uv = data.current.uv_index;
@@ -1039,16 +1036,17 @@ pub fn WeatherDisplay(
                             format!("☀️ UV: {:.1} ({})", uv, translate_category(uv_cat, &lang))
                         }
                     }
-                    // Sea temperature (if available)
-                    if let Some(sea_temp) = data.current.sea_temperature {
-                        p {
-                            {
-                                format!(
-                                    "🌊 {}: {:.1}{}",
-                                    if lang == Language::English { "Sea" } else { "Море" },
-                                    convert_temp(sea_temp, &temp_unit),
-                                    temp_unit_str,
-                                )
+                    if is_coastal_city(&data.city) {
+                        if let Some(sea_temp) = data.current.sea_temperature {
+                            p {
+                                {
+                                    format!(
+                                        "🌊 {}: {:.1}{}",
+                                        if lang == Language::English { "Sea" } else { "Море" },
+                                        convert_temp(sea_temp, &temp_unit),
+                                        temp_unit_str,
+                                    )
+                                }
                             }
                         }
                     }
