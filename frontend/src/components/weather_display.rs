@@ -1,10 +1,9 @@
 use crate::helpers::condition_icon_from_text;
 use crate::helpers::convert_pressure;
 use crate::helpers::convert_temp;
-use crate::helpers::convert_wind; // <-- added for wind conversion
+use crate::helpers::convert_wind;
 use crate::helpers::format_forecast_label;
 use crate::helpers::format_time;
-use crate::helpers::humidity_category;
 use crate::helpers::is_coastal_city;
 use crate::helpers::moon_emoji_from_phase;
 use crate::helpers::pressure_category;
@@ -358,15 +357,15 @@ pub fn WeatherDisplay(
             translate_category(wind_cat, &lang)
         );
 
-        let humidity_str = format!(
-            "{}: {}% ({})",
+        // Precipitation probability
+        let precip_str = format!(
+            "{}: {}%",
             if lang == Language::English {
-                "Humidity"
+                "Rain"
             } else {
-                "Влажность"
+                "Дождь"
             },
-            displayed_hour.humidity as u32,
-            translate_category(humidity_category(displayed_hour.humidity), &lang)
+            displayed_hour.precipitation_probability as u32,
         );
 
         let pressure_val = convert_pressure(displayed_hour.pressure, &pressure_unit);
@@ -411,7 +410,7 @@ pub fn WeatherDisplay(
                         div { "{p.icon}  {cond_text}" }
                         div { "{p.temp_str}" }
                         div { "💨 {wind_str}" }
-                        div { "💧 {humidity_str}" }
+                        div { "🌧️ {precip_str}" }
                         div { "📊 {pressure_str}" }
                         div { "☀️ {uv_str}" }
                         if !sea_str.is_empty() {
@@ -702,15 +701,15 @@ pub fn WeatherDisplay(
             translate_category(wind_cat, &lang)
         );
 
-        let humidity_range = format!(
-            "{}: {}% – {}%",
+        // Precipitation probability (daily max)
+        let precip_day_str = format!(
+            "{}: {}%",
             if lang == Language::English {
-                "Humidity"
+                "Rain"
             } else {
-                "Влажность"
+                "Дождь"
             },
-            day.humidity_min as u32,
-            day.humidity_max as u32
+            day.precipitation_probability_max as u32,
         );
 
         let uv_max_str = format!(
@@ -754,7 +753,7 @@ pub fn WeatherDisplay(
                         div { "{high_line}" }
                         div { "{low_line}" }
                         div { "💨 {wind_str}" }
-                        div { "💧 {humidity_range}" }
+                        div { "🌧️ {precip_day_str}" }
                         div { "☀️ {uv_max_str}" }
                     }
                 }
@@ -1007,12 +1006,10 @@ pub fn WeatherDisplay(
                     }
                     p {
                         {
-                            let hum_cat = humidity_category(data.current.humidity);
                             format!(
-                                "💧 {}: {}% ({})",
-                                if lang == Language::English { "Humidity" } else { "Влажность" },
-                                data.current.humidity as u32,
-                                translate_category(hum_cat, &lang),
+                                "🌧️ {}: {}%",
+                                if lang == Language::English { "Rain" } else { "Дождь" },
+                                data.current.precipitation_probability as u32,
                             )
                         }
                     }
