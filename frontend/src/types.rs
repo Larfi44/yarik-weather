@@ -5,10 +5,10 @@ pub struct CurrentData {
     pub temperature: f64,
     pub wind_speed: f64,
     pub condition: String,
-    pub humidity: f64,
     pub pressure: f64,
     pub sea_temperature: Option<f64>,
     pub uv_index: f64,
+    pub precipitation_probability: f64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -18,10 +18,10 @@ pub struct HourlyData {
     pub temperature: f64,
     pub wind_speed: f64,
     pub condition: String,
-    pub humidity: f64,
     pub pressure: f64,
     pub sea_temperature: Option<f64>,
     pub uv_index: f64,
+    pub precipitation_probability: f64, // this hour’s rain chance
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -35,9 +35,8 @@ pub struct DailyData {
     pub sunset: Option<String>,
     pub moon_phase_name: Option<String>,
     pub moon_illumination: Option<f64>,
-    pub humidity_max: f64,
-    pub humidity_min: f64,
     pub uv_index_max: f64,
+    pub precipitation_probability_max: f64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]

@@ -247,18 +247,6 @@ pub fn uv_category(uv: f64) -> &'static str {
     }
 }
 
-pub fn humidity_category(humidity: f64) -> &'static str {
-    if humidity < 30.0 {
-        "Low"
-    } else if humidity < 60.0 {
-        "Comfortable"
-    } else if humidity < 80.0 {
-        "High"
-    } else {
-        "Very High"
-    }
-}
-
 pub fn pressure_category(hpa: f64) -> &'static str {
     if hpa < 980.0 {
         "Low"
@@ -431,7 +419,6 @@ const COASTAL_CITIES_EN: &[&str] = &[
     "Tel Aviv",
 ];
 
-// Russian names (language=ru) – same order as above
 const COASTAL_CITIES_RU: &[&str] = &[
     // Russia (50)
     "Сочи",
@@ -559,5 +546,7 @@ pub fn is_coastal_city(city: &str) -> bool {
     COASTAL_CITIES_EN
         .iter()
         .any(|c| c.eq_ignore_ascii_case(city))
-        || COASTAL_CITIES_RU.iter().any(|c| *c == city)
+        || COASTAL_CITIES_RU
+            .iter()
+            .any(|c| c.to_lowercase() == city.to_lowercase())
 }
