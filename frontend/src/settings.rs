@@ -6,17 +6,16 @@ use dioxus::prelude::*;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub enum Language {
+    English,
+    Russian,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum TempUnit {
     Celsius,
     Fahrenheit,
     Kelvin,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
-pub enum Theme {
-    Auto,
-    Light,
-    Dark,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -27,9 +26,17 @@ pub enum WindUnit {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub enum Language {
-    English,
-    Russian,
+pub enum PressureUnit {
+    HPa,
+    MmHg,
+    InHg,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+pub enum Theme {
+    Auto,
+    Light,
+    Dark,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -40,6 +47,7 @@ pub struct UserSettings {
     pub default_city: String,
     pub theme: Theme,
     pub first_time: bool,
+    pub pressure_unit: PressureUnit, // new field
 }
 
 impl Default for UserSettings {
@@ -51,6 +59,7 @@ impl Default for UserSettings {
             default_city: String::new(),
             theme: Theme::Auto,
             first_time: true,
+            pressure_unit: PressureUnit::HPa, // default to hPa
         }
     }
 }

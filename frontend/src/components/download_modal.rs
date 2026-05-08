@@ -33,12 +33,12 @@ mod inner {
     pub fn download_description(os: DownloadOs, lang: &Language) -> &'static str {
         match (os, lang) {
             (DownloadOs::Android, Language::English) => ".apk for Android",
-            (DownloadOs::Windows, Language::English) => ".zip for PC",
-            (DownloadOs::MacOS, Language::English) => ".zip for Mac (see instructions)",
+            (DownloadOs::Windows, Language::English) => ".exe for Windows",
+            (DownloadOs::MacOS, Language::English) => ".dmg for Mac (see instructions)",
             (DownloadOs::Linux, Language::English) => "from source (open-source)",
             (DownloadOs::Android, Language::Russian) => ".apk для Android",
-            (DownloadOs::Windows, Language::Russian) => ".zip для ПК",
-            (DownloadOs::MacOS, Language::Russian) => ".zip для Mac (см. инструкцию)",
+            (DownloadOs::Windows, Language::Russian) => ".exe для Windows",
+            (DownloadOs::MacOS, Language::Russian) => ".dmg для Mac",
             (DownloadOs::Linux, Language::Russian) => "из исходников (open-source)",
         }
     }

@@ -208,6 +208,7 @@ pub fn App() -> Element {
                         data: data.clone(),
                         temp_unit: settings().temp_unit.clone(),
                         wind_unit: settings().wind_unit.clone(),
+                        pressure_unit: settings().pressure_unit.clone(),
                         lang: settings().language.clone(),
                         theme: resolved_theme,
                     }

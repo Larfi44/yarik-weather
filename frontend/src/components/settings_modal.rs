@@ -2,6 +2,7 @@ use crate::helpers::open_link;
 use crate::settings::choice_btn_class;
 use crate::settings::save_settings;
 use crate::settings::Language;
+use crate::settings::PressureUnit;
 use crate::settings::TempUnit;
 use crate::settings::Theme;
 use crate::settings::UserSettings;
@@ -47,6 +48,7 @@ pub fn SettingsModal(
                     button { class: "close-btn", onclick: handle_close, "✖" }
                 }
 
+                // Language
                 div { class: "setting-row",
                     label {
                         if lang == Language::English {
@@ -75,6 +77,7 @@ pub fn SettingsModal(
                     }
                 }
 
+                // Temperature unit
                 div { class: "setting-row",
                     label {
                         if lang == Language::English {
@@ -86,7 +89,10 @@ pub fn SettingsModal(
                     div { class: "choice-group",
                         button {
                             class: choice_btn_class(temp_settings().temp_unit == TempUnit::Celsius),
-                            onclick: move |_| temp_settings.write().temp_unit = TempUnit::Celsius,
+                            onclick: move |_| {
+                                temp_settings.write().temp_unit = TempUnit::Celsius;
+                                notify_change();
+                            },
                             if lang == Language::English {
                                 "Celsius (°C)"
                             } else {
@@ -95,7 +101,10 @@ pub fn SettingsModal(
                         }
                         button {
                             class: choice_btn_class(temp_settings().temp_unit == TempUnit::Fahrenheit),
-                            onclick: move |_| temp_settings.write().temp_unit = TempUnit::Fahrenheit,
+                            onclick: move |_| {
+                                temp_settings.write().temp_unit = TempUnit::Fahrenheit;
+                                notify_change();
+                            },
                             if lang == Language::English {
                                 "Fahrenheit (°F)"
                             } else {
@@ -104,7 +113,10 @@ pub fn SettingsModal(
                         }
                         button {
                             class: choice_btn_class(temp_settings().temp_unit == TempUnit::Kelvin),
-                            onclick: move |_| temp_settings.write().temp_unit = TempUnit::Kelvin,
+                            onclick: move |_| {
+                                temp_settings.write().temp_unit = TempUnit::Kelvin;
+                                notify_change();
+                            },
                             if lang == Language::English {
                                 "Kelvin (K)"
                             } else {
@@ -114,6 +126,7 @@ pub fn SettingsModal(
                     }
                 }
 
+                // Wind unit
                 div { class: "setting-row",
                     label {
                         if lang == Language::English {
@@ -125,7 +138,10 @@ pub fn SettingsModal(
                     div { class: "choice-group",
                         button {
                             class: choice_btn_class(temp_settings().wind_unit == WindUnit::Mps),
-                            onclick: move |_| temp_settings.write().wind_unit = WindUnit::Mps,
+                            onclick: move |_| {
+                                temp_settings.write().wind_unit = WindUnit::Mps;
+                                notify_change();
+                            },
                             if lang == Language::English {
                                 "m/s"
                             } else {
@@ -134,7 +150,10 @@ pub fn SettingsModal(
                         }
                         button {
                             class: choice_btn_class(temp_settings().wind_unit == WindUnit::Kmph),
-                            onclick: move |_| temp_settings.write().wind_unit = WindUnit::Kmph,
+                            onclick: move |_| {
+                                temp_settings.write().wind_unit = WindUnit::Kmph;
+                                notify_change();
+                            },
                             if lang == Language::English {
                                 "km/h"
                             } else {
@@ -143,7 +162,10 @@ pub fn SettingsModal(
                         }
                         button {
                             class: choice_btn_class(temp_settings().wind_unit == WindUnit::Mph),
-                            onclick: move |_| temp_settings.write().wind_unit = WindUnit::Mph,
+                            onclick: move |_| {
+                                temp_settings.write().wind_unit = WindUnit::Mph;
+                                notify_change();
+                            },
                             if lang == Language::English {
                                 "mph"
                             } else {
@@ -153,6 +175,56 @@ pub fn SettingsModal(
                     }
                 }
 
+                // Pressure unit
+                div { class: "setting-row",
+                    label {
+                        if lang == Language::English {
+                            "Pressure unit:"
+                        } else {
+                            "Единица давления:"
+                        }
+                    }
+                    div { class: "choice-group",
+                        button {
+                            class: choice_btn_class(temp_settings().pressure_unit == PressureUnit::HPa),
+                            onclick: move |_| {
+                                temp_settings.write().pressure_unit = PressureUnit::HPa;
+                                notify_change();
+                            },
+                            if lang == Language::English {
+                                "hPa"
+                            } else {
+                                "гПа"
+                            }
+                        }
+                        button {
+                            class: choice_btn_class(temp_settings().pressure_unit == PressureUnit::MmHg),
+                            onclick: move |_| {
+                                temp_settings.write().pressure_unit = PressureUnit::MmHg;
+                                notify_change();
+                            },
+                            if lang == Language::English {
+                                "mmHg"
+                            } else {
+                                "мм. рт. ст."
+                            }
+                        }
+                        button {
+                            class: choice_btn_class(temp_settings().pressure_unit == PressureUnit::InHg),
+                            onclick: move |_| {
+                                temp_settings.write().pressure_unit = PressureUnit::InHg;
+                                notify_change();
+                            },
+                            if lang == Language::English {
+                                "inHg"
+                            } else {
+                                "дюйм рт. ст."
+                            }
+                        }
+                    }
+                }
+
+                // Theme
                 div { class: "setting-row",
                     label {
                         if lang == Language::English {
@@ -201,6 +273,7 @@ pub fn SettingsModal(
                     }
                 }
 
+                // Default city
                 div { class: "setting-row",
                     label {
                         if lang == Language::English {
