@@ -1,10 +1,18 @@
 use crate::helpers::condition_icon_from_text;
+use crate::helpers::convert_pressure;
+use crate::helpers::convert_temp;
 use crate::helpers::format_forecast_label;
 use crate::helpers::format_time;
+use crate::helpers::humidity_category;
 use crate::helpers::moon_emoji_from_phase;
+use crate::helpers::pressure_category;
+use crate::helpers::translate_category;
 use crate::helpers::translate_condition;
 use crate::helpers::translate_moon_phase;
+use crate::helpers::uv_category;
+use crate::helpers::wind_category;
 use crate::settings::Language;
+use crate::settings::PressureUnit;
 use crate::settings::TempUnit;
 use crate::settings::Theme;
 use crate::settings::WindUnit;
@@ -20,15 +28,16 @@ pub fn WeatherDisplay(
     data: WeatherResponse,
     temp_unit: TempUnit,
     wind_unit: WindUnit,
+    pressure_unit: PressureUnit,
     lang: Language,
     theme: Theme,
 ) -> Element {
-    let temp_unit_str: &str = match temp_unit {
+    let temp_unit_str = match temp_unit {
         TempUnit::Celsius => "°C",
         TempUnit::Fahrenheit => "°F",
         TempUnit::Kelvin => "K",
     };
-    let wind_unit_str: &str = match wind_unit {
+    let wind_unit_str = match wind_unit {
         WindUnit::Mps => {
             if lang == Language::English {
                 "m/s"
@@ -50,6 +59,14 @@ pub fn WeatherDisplay(
                 "миль/ч"
             }
         }
+    };
+    let pressure_unit_str = match (&pressure_unit, &lang) {
+        (PressureUnit::HPa, Language::English) => "hPa",
+        (PressureUnit::HPa, Language::Russian) => "гПа",
+        (PressureUnit::MmHg, Language::English) => "mmHg",
+        (PressureUnit::MmHg, Language::Russian) => "мм рт. ст.",
+        (PressureUnit::InHg, Language::English) => "inHg",
+        (PressureUnit::InHg, Language::Russian) => "дюйм рт. ст.",
     };
     let condition_icon_str: &str = condition_icon_from_text(&data.current.condition);
     let na = || "N/A".to_string();
@@ -328,44 +345,104 @@ pub fn WeatherDisplay(
         }
         children
     };
+
+    // Hourly tooltip
     let hourly_tooltip: Option<VNode> = h_hovered().and_then(|idx| {
         let displayed_hour = displayed_hours.get(idx)?;
         let p = h_points.get(idx)?;
         let cond_text = translate_condition(&displayed_hour.condition, &lang);
+
+        let wind_val = displayed_hour.wind_speed;
+        let wind_cat = wind_category(wind_val);
         let wind_str = format!(
-            "{}: {:.1} {}",
+            "{}: {:.1} {} ({})",
             if lang == Language::English {
                 "Wind"
             } else {
                 "Ветер"
             },
-            displayed_hour.wind_speed,
+            wind_val,
             wind_unit_str,
+            translate_category(wind_cat, &lang)
         );
-        let tooltip_width = 130.0;
-        let half_width = tooltip_width / 2.0;
-        let x_ratio = p.x / h_svg_width;
-        let offset = (x_ratio - 0.5) * 60.0;
-        let tooltip_x = (p.x - half_width + offset)
-            .max(0.0)
-            .min(h_svg_width - tooltip_width);
+
+        let humidity_str = format!(
+            "{}: {}% ({})",
+            if lang == Language::English {
+                "Humidity"
+            } else {
+                "Влажность"
+            },
+            displayed_hour.humidity as u32,
+            translate_category(humidity_category(displayed_hour.humidity), &lang)
+        );
+
+        let pressure_val = convert_pressure(displayed_hour.pressure, &pressure_unit);
+        let pressure_str = format!(
+            "{}: {:.1} {} ({})",
+            if lang == Language::English {
+                "Pressure"
+            } else {
+                "Давление"
+            },
+            pressure_val,
+            pressure_unit_str,
+            translate_category(pressure_category(displayed_hour.pressure), &lang)
+        );
+
+        let uv_str = format!(
+            "UV: {:.1} ({})",
+            displayed_hour.uv_index,
+            translate_category(uv_category(displayed_hour.uv_index), &lang)
+        );
+
+        let mut sea_str = String::new();
+        if let Some(st) = displayed_hour.sea_temperature {
+            sea_str = format!(
+                "{}: {:.1}{}",
+                if lang == Language::English {
+                    "Sea"
+                } else {
+                    "Море"
+                },
+                convert_temp(st, &temp_unit),
+                temp_unit_str
+            );
+        }
+
+        let tooltip_width = 160.0;
+        let tooltip_height = 160.0;
+        let offset = 15.0;
+
+        let (tooltip_x, tooltip_y) = if p.x < h_svg_width / 2.0 {
+            (p.x + offset, p.y - tooltip_height / 1.5)
+        } else {
+            (p.x - tooltip_width - offset, p.y - tooltip_height / 1.5)
+        };
         Some(
             rsx! {
                 foreignObject {
                     x: format!("{:.1}", tooltip_x),
-                    y: format!("{:.1}", p.y - 160.0),
+                    y: format!("{:.1}", tooltip_y),
                     width: format!("{:.0}", tooltip_width),
-                    height: "90",
+                    height: format!("{:.0}", tooltip_height),
                     div { class: "chart-tooltip",
                         div { "{p.icon}  {cond_text}" }
                         div { "{p.temp_str}" }
-                        div { "{wind_str}" }
+                        div { "💨 {wind_str}" }
+                        div { "💧 {humidity_str}" }
+                        div { "📊 {pressure_str}" }
+                        div { "☀️ {uv_str}" }
+                        if !sea_str.is_empty() {
+                            div { "🌊 {sea_str}" }
+                        }
                     }
                 }
             }
             .unwrap(),
         )
     });
+
     let hourly_chart: VNode = rsx! {
         svg {
             view_box: format!("0 0 {:.0} {:.0}", h_svg_width, h_view_height),
@@ -494,7 +571,7 @@ pub fn WeatherDisplay(
 
     let mut d_hovered = use_signal(|| None::<usize>);
 
-    // Daily SVG children
+    // Daily SVG children (unchanged)
     let daily_svg_children: Vec<VNode> = {
         let mut children: Vec<VNode> = Vec::new();
         for p in &d_points {
@@ -612,6 +689,7 @@ pub fn WeatherDisplay(
         children
     };
 
+    // Daily tooltip
     let daily_tooltip: Option<VNode> = d_hovered().and_then(|idx| {
         let day: &&DailyData = chart_days.get(idx)?;
         let p: &DailyPointOwned = d_points.get(idx)?;
@@ -631,8 +709,10 @@ pub fn WeatherDisplay(
             high_label, day.temperature_max, temp_unit_str
         );
         let low: String = format!("{}: {:.0}{}", low_label, day.temperature_min, temp_unit_str);
+
+        let wind_cat = wind_category(day.wind_speed_max);
         let wind: String = format!(
-            "{}: {:.1} {}",
+            "{}: {:.1} {} ({})",
             if lang == Language::English {
                 "Wind"
             } else {
@@ -640,26 +720,48 @@ pub fn WeatherDisplay(
             },
             day.wind_speed_max,
             wind_unit_str,
+            translate_category(wind_cat, &lang)
         );
-        let tooltip_width: f64 = 140.0;
-        let half_width: f64 = tooltip_width / 2.0;
-        let x_ratio: f64 = p.x / d_svg_width;
-        let offset: f64 = (x_ratio - 0.5) * 60.0;
-        let tooltip_x: f64 = (p.x - half_width + offset)
-            .max(0.0)
-            .min(d_svg_width - tooltip_width);
+
+        let humidity_range = format!(
+            "{}: {}% – {}%",
+            if lang == Language::English {
+                "Humidity"
+            } else {
+                "Влажность"
+            },
+            day.humidity_min as u32,
+            day.humidity_max as u32
+        );
+
+        let uv_max_str = format!(
+            "UV max: {:.1} ({})",
+            day.uv_index_max,
+            translate_category(uv_category(day.uv_index_max), &lang)
+        );
+
+        let tooltip_width = 180.0;
+        let tooltip_height = 110.0;
+        let offset = 15.0;
+        let (tooltip_x, tooltip_y) = if p.x < d_svg_width / 2.0 {
+            (p.x + offset, p.y_max - tooltip_height / 1.5)
+        } else {
+            (p.x - tooltip_width - offset, p.y_max - tooltip_height / 1.5)
+        };
         Some(
             rsx! {
                 foreignObject {
                     x: format!("{:.1}", tooltip_x),
-                    y: format!("{:.1}", p.y_max - 150.0),
+                    y: format!("{:.1}", tooltip_y),
                     width: format!("{:.0}", tooltip_width),
-                    height: "100",
+                    height: format!("{:.0}", tooltip_height),
                     div { class: "chart-tooltip",
                         div { "{p.icon}  {cond_text}" }
                         div { "{high}" }
                         div { "{low}" }
-                        div { "{wind}" }
+                        div { "💨 {wind}" }
+                        div { "💧 {humidity_range}" }
+                        div { "☀️ {uv_max_str}" }
                     }
                 }
             }
@@ -697,7 +799,7 @@ pub fn WeatherDisplay(
     }
     .unwrap();
 
-    // ---- Astronomy section ----
+    // ---- Astronomy section (unchanged) ----
     let astronomy_section: Option<VNode> = data.forecast.first().map(|first_day| {
         let moon_phase: String = first_day
             .moon_phase_name
@@ -873,6 +975,7 @@ pub fn WeatherDisplay(
         format!("Почасовой прогноз на {}", day_labels[selected_day])
     };
 
+    // ---------- Final layout (current weather details updated) ----------
     rsx! {
         div { class: "weather-container",
             div { class: "current-weather glass-card",
@@ -889,14 +992,64 @@ pub fn WeatherDisplay(
                     }
                 }
                 div { class: "weather-details",
+                    // Wind with category
                     p {
                         {
+                            let wind_cat = wind_category(data.current.wind_speed);
                             format!(
-                                "💨 {}: {:.1} {}",
+                                "💨 {}: {:.1} {} ({})",
                                 if lang == Language::English { "Wind" } else { "Ветер" },
                                 data.current.wind_speed,
                                 wind_unit_str,
+                                translate_category(wind_cat, &lang),
                             )
+                        }
+                    }
+                    // Humidity with category
+                    p {
+                        {
+                            let hum_cat = humidity_category(data.current.humidity);
+                            format!(
+                                "💧 {}: {}% ({})",
+                                if lang == Language::English { "Humidity" } else { "Влажность" },
+                                data.current.humidity as u32,
+                                translate_category(hum_cat, &lang),
+                            )
+                        }
+                    }
+                    // Pressure converted and with category
+                    p {
+                        {
+                            let press_val = convert_pressure(data.current.pressure, &pressure_unit);
+                            let press_cat = pressure_category(data.current.pressure);
+                            format!(
+                                "📊 {}: {:.1} {} ({})",
+                                if lang == Language::English { "Pressure" } else { "Давление" },
+                                press_val,
+                                pressure_unit_str,
+                                translate_category(press_cat, &lang),
+                            )
+                        }
+                    }
+                    // UV Index with category
+                    p {
+                        {
+                            let uv = data.current.uv_index;
+                            let uv_cat = uv_category(uv);
+                            format!("☀️ UV: {:.1} ({})", uv, translate_category(uv_cat, &lang))
+                        }
+                    }
+                    // Sea temperature (if available)
+                    if let Some(sea_temp) = data.current.sea_temperature {
+                        p {
+                            {
+                                format!(
+                                    "🌊 {}: {:.1}{}",
+                                    if lang == Language::English { "Sea" } else { "Море" },
+                                    convert_temp(sea_temp, &temp_unit),
+                                    temp_unit_str,
+                                )
+                            }
                         }
                     }
                 }

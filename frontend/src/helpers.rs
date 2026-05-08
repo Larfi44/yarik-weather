@@ -1,4 +1,5 @@
 use crate::settings::Language;
+use crate::settings::PressureUnit;
 use crate::settings::TempUnit;
 use crate::settings::WindUnit;
 
@@ -221,5 +222,88 @@ pub fn open_link(url: &str) {
         // For desktop, we'll need to use a different approach
         // This is a placeholder - you might want to use a crate like "open" for desktop
         let _ = std::process::Command::new("open").arg(url).spawn();
+    }
+}
+
+pub fn convert_pressure(hpa: f64, unit: &PressureUnit) -> f64 {
+    match unit {
+        PressureUnit::HPa => hpa,
+        PressureUnit::MmHg => hpa * 0.750062,
+        PressureUnit::InHg => hpa * 0.02953,
+    }
+}
+
+pub fn uv_category(uv: f64) -> &'static str {
+    if uv < 3.0 {
+        "Low"
+    } else if uv < 6.0 {
+        "Moderate"
+    } else if uv < 8.0 {
+        "High"
+    } else if uv < 11.0 {
+        "Very High"
+    } else {
+        "Extreme"
+    }
+}
+
+pub fn humidity_category(humidity: f64) -> &'static str {
+    if humidity < 30.0 {
+        "Low"
+    } else if humidity < 60.0 {
+        "Comfortable"
+    } else if humidity < 80.0 {
+        "High"
+    } else {
+        "Very High"
+    }
+}
+
+pub fn pressure_category(hpa: f64) -> &'static str {
+    if hpa < 980.0 {
+        "Low"
+    } else if hpa < 1010.0 {
+        "Normal"
+    } else if hpa < 1040.0 {
+        "High"
+    } else {
+        "Very High"
+    }
+}
+
+pub fn wind_category(ms: f64) -> &'static str {
+    if ms < 0.5 {
+        "Calm"
+    } else if ms < 5.5 {
+        "Light"
+    } else if ms < 8.0 {
+        "Moderate"
+    } else if ms < 10.8 {
+        "Fresh"
+    } else if ms < 13.9 {
+        "Strong"
+    } else {
+        "Gale+"
+    }
+}
+
+pub fn translate_category(cat: &str, lang: &Language) -> String {
+    if *lang == Language::English {
+        return cat.to_string();
+    }
+    match cat {
+        "Low" => "Низкая".into(),
+        "Moderate" => "Умеренная".into(),
+        "High" => "Высокая".into(),
+        "Very High" => "Очень высокая".into(),
+        "Extreme" => "Чрезмерная".into(),
+        "Comfortable" => "Комфортная".into(),
+        "Normal" => "Нормальное".into(),
+        "Calm" => "Штиль".into(),
+        "Light" => "Лёгкий".into(),
+        "Fresh" => "Свежий".into(),
+        "Strong" => "Сильный".into(),
+        "Gale+" => "Шторм".into(),
+        _ => cat.to_string(),
     }
 }

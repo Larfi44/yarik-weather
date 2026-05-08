@@ -1,6 +1,7 @@
 use crate::settings::choice_btn_class;
 use crate::settings::save_settings;
 use crate::settings::Language;
+use crate::settings::PressureUnit;
 use crate::settings::TempUnit;
 use crate::settings::Theme;
 use crate::settings::UserSettings;
@@ -142,6 +143,42 @@ pub fn WelcomeModal(
                             } else {
                                 "миль/ч"
                             }
+                        }
+                    }
+                }
+
+                div { class: "setting-row",
+                    label {
+                        if lang == Language::English {
+                            "Pressure unit:"
+                        } else {
+                            "Единица давления:"
+                        }
+                    }
+                    div { class: "choice-group",
+                        button {
+                            class: choice_btn_class(temp_settings().pressure_unit == PressureUnit::HPa),
+                            onclick: move |_| {
+                                temp_settings.write().pressure_unit = PressureUnit::HPa;
+                                notify_change();
+                            },
+                            "hPa"
+                        }
+                        button {
+                            class: choice_btn_class(temp_settings().pressure_unit == PressureUnit::MmHg),
+                            onclick: move |_| {
+                                temp_settings.write().pressure_unit = PressureUnit::MmHg;
+                                notify_change();
+                            },
+                            "mmHg"
+                        }
+                        button {
+                            class: choice_btn_class(temp_settings().pressure_unit == PressureUnit::InHg),
+                            onclick: move |_| {
+                                temp_settings.write().pressure_unit = PressureUnit::InHg;
+                                notify_change();
+                            },
+                            "inHg"
                         }
                     }
                 }
