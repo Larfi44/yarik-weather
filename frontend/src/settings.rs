@@ -1,9 +1,10 @@
-use crate::api::SETTINGS_KEY;
 use crate::assets::APPLE_DARK;
 use crate::assets::APPLE_LIGHT;
 
 use dioxus::prelude::*;
 use serde::{Deserialize, Serialize};
+
+pub const SETTINGS_KEY: &str = "weather_settings";
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum Language {
@@ -59,7 +60,7 @@ impl Default for UserSettings {
             default_city: String::new(),
             theme: Theme::Auto,
             first_time: true,
-            pressure_unit: PressureUnit::HPa, // default to hPa
+            pressure_unit: PressureUnit::HPa,
         }
     }
 }
