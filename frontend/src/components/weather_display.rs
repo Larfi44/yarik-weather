@@ -361,9 +361,9 @@ pub fn WeatherDisplay(
         let precip_str = format!(
             "{}: {}%",
             if lang == Language::English {
-                "Rain"
+                "Precipitation probability"
             } else {
-                "Дождь"
+                "Вероятность осадков"
             },
             displayed_hour.precipitation_probability as u32,
         );
@@ -382,7 +382,12 @@ pub fn WeatherDisplay(
         );
 
         let uv_str = format!(
-            "UV: {:.1} ({})",
+            "{}: {:.1} ({})",
+            if lang == Language::English {
+                "UV"
+            } else {
+                "Ультрафиолет"
+            },
             displayed_hour.uv_index,
             translate_category(uv_category(displayed_hour.uv_index), &lang)
         );
@@ -705,15 +710,20 @@ pub fn WeatherDisplay(
         let precip_day_str = format!(
             "{}: {}%",
             if lang == Language::English {
-                "Rain"
+                "Precipitation probability"
             } else {
-                "Дождь"
+                "Вероятность осадков"
             },
             day.precipitation_probability_max as u32,
         );
 
         let uv_max_str = format!(
-            "UV max: {:.1} ({})",
+            "{}: {:.1} ({})",
+            if lang == Language::English {
+                "UV max"
+            } else {
+                "Макс. ультрафиолет"
+            },
             day.uv_index_max,
             translate_category(uv_category(day.uv_index_max), &lang)
         );
@@ -1008,7 +1018,11 @@ pub fn WeatherDisplay(
                         {
                             format!(
                                 "🌧️ {}: {}%",
-                                if lang == Language::English { "Rain" } else { "Дождь" },
+                                if lang == Language::English {
+                                    "Precipitation probability"
+                                } else {
+                                    "Вероятность осадков"
+                                },
                                 data.current.precipitation_probability as u32,
                             )
                         }
@@ -1030,7 +1044,12 @@ pub fn WeatherDisplay(
                         {
                             let uv = data.current.uv_index;
                             let uv_cat = uv_category(uv);
-                            format!("☀️ UV: {:.1} ({})", uv, translate_category(uv_cat, &lang))
+                            format!(
+                                "☀️ {}: {:.1} ({})",
+                                if lang == Language::English { "UV" } else { "Ультрафиолет" },
+                                uv,
+                                translate_category(uv_cat, &lang),
+                            )
                         }
                     }
                     if is_coastal_city(&data.city) {

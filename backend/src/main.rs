@@ -1,9 +1,9 @@
 use axum::{
+    Router,
     extract::Query,
     http::StatusCode,
     response::{IntoResponse, Json},
     routing::get,
-    Router,
 };
 use chrono::NaiveDate;
 use reqwest::Client;
@@ -195,7 +195,8 @@ fn moon_phase_for_date(date: NaiveDate) -> (String, f64) {
     let age = days_since_reference % synodic_month;
     let age = if age < 0.0 { age + synodic_month } else { age };
 
-    let illumination = ((1.0 - (2.0 * std::f64::consts::PI * age / synodic_month).cos()) / 2.0 * 100.0)
+    let illumination = ((1.0 - (2.0 * std::f64::consts::PI * age / synodic_month).cos()) / 2.0
+        * 100.0)
         .clamp(0.0, 100.0);
 
     let phase_name = if age < 1.84566 {
@@ -219,7 +220,10 @@ fn moon_phase_for_date(date: NaiveDate) -> (String, f64) {
     (phase_name.to_string(), illumination)
 }
 
-async fn fetch_json<T: serde::de::DeserializeOwned>(client: &Client, url: &str) -> anyhow::Result<T> {
+async fn fetch_json<T: serde::de::DeserializeOwned>(
+    client: &Client,
+    url: &str,
+) -> anyhow::Result<T> {
     let resp = client.get(url).send().await?;
     if !resp.status().is_success() {
         return Err(anyhow::anyhow!(
@@ -233,7 +237,9 @@ async fn fetch_json<T: serde::de::DeserializeOwned>(client: &Client, url: &str) 
 
 async fn get_coordinates(client: &Client, city: &str) -> anyhow::Result<(f64, f64)> {
     let encoded = urlencoding::encode(city);
-    let has_cyrillic = city.chars().any(|c| c as u32 > 0x0400 && c as u32 <= 0x04FF);
+    let has_cyrillic = city
+        .chars()
+        .any(|c| c as u32 > 0x0400 && c as u32 <= 0x04FF);
     let lang = if has_cyrillic { "ru" } else { "en" };
 
     let api_url = format!(
@@ -380,8 +386,16 @@ async fn get_weather_data(client: &Client, city: &str) -> anyhow::Result<Weather
             .unwrap_or_else(|_| NaiveDate::from_ymd_opt(1970, 1, 1).unwrap());
         let (moon_name, moon_illum) = moon_phase_for_date(parsed_date);
 
-        let sunrise = forecast.daily.sunrise.as_ref().and_then(|v| v.get(i).cloned());
-        let sunset = forecast.daily.sunset.as_ref().and_then(|v| v.get(i).cloned());
+        let sunrise = forecast
+            .daily
+            .sunrise
+            .as_ref()
+            .and_then(|v| v.get(i).cloned());
+        let sunset = forecast
+            .daily
+            .sunset
+            .as_ref()
+            .and_then(|v| v.get(i).cloned());
 
         let precip_max = forecast
             .daily
@@ -454,6 +468,10 @@ impl IntoResponse for AppError {
 async fn main() {
     let client = Client::new();
 
+    // Read the port from the environment (default to 8080 if not set)
+    let port = std::env::var("PORT").unwrap_or_else(|_| "8080".to_string());
+    let bind_addr = format!("0.0.0.0:{}", port);
+
     // CORS layer (permissive)
     let cors = tower_http::cors::CorsLayer::new()
         .allow_origin(tower_http::cors::Any)
@@ -482,7 +500,8 @@ async fn main() {
         ))
         .with_state(Arc::new(client));
 
-    let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
-    println!("Server running on http://0.0.0.0:8080");
+    println!("Server binding to {}", bind_addr);
+    let listener = tokio::net::TcpListener::bind(&bind_addr).await.unwrap();
+    println!("Server running on http://{}", bind_addr);
     axum::serve(listener, app).await.unwrap();
 }
