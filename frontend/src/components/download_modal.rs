@@ -34,12 +34,12 @@ mod inner {
         match (os, lang) {
             (DownloadOs::Android, Language::English) => ".apk for Android",
             (DownloadOs::Windows, Language::English) => ".exe for Windows",
-            (DownloadOs::MacOS, Language::English) => ".dmg for Mac (see instructions)",
-            (DownloadOs::Linux, Language::English) => "from source (open-source)",
+            (DownloadOs::MacOS, Language::English) => ".dmg for Mac (see below)",
+            (DownloadOs::Linux, Language::English) => "from source (see below)",
             (DownloadOs::Android, Language::Russian) => ".apk для Android",
             (DownloadOs::Windows, Language::Russian) => ".exe для Windows",
-            (DownloadOs::MacOS, Language::Russian) => ".dmg для Mac",
-            (DownloadOs::Linux, Language::Russian) => "из исходников (open-source)",
+            (DownloadOs::MacOS, Language::Russian) => ".dmg для Mac (инструкция ниже)",
+            (DownloadOs::Linux, Language::Russian) => "из исходников (инструкция ниже)",
         }
     }
 
@@ -91,7 +91,8 @@ mod inner {
         let install_app_command =
             "cargo install --git https://github.com/Larfi44/yarik-weather --features desktop";
 
-        let download_grid: VNode = rsx! {
+        // Scrollable area: cards + Linux instructions
+        let scroll_content = rsx! {
             div { class: "download-grid",
                 for os in oss.iter().copied() {
                     {
@@ -114,98 +115,89 @@ mod inner {
                     }
                 }
             }
-        }
-        .unwrap();
+            // Linux installation steps
+            if selected() == DownloadOs::Linux {
+                div { class: "linux-instructions",
+                    div { class: "linux-step",
+                        p { class: "linux-step-text",
+                            if lang == Language::English {
+                                "1. Install Rust"
+                            } else {
+                                "1. Установите Rust"
+                            }
+                        }
+                        code { "{install_rust_command}" }
+                    }
+                    div { class: "linux-step",
+                        p { class: "linux-step-text",
+                            if lang == Language::English {
+                                "2. Install Yarik Weather"
+                            } else {
+                                "2. Установите Yarik Weather"
+                            }
+                        }
+                        code { "{install_app_command}" }
+                    }
+                }
+            }
+        };
 
-        let action_area: VNode = if selected() == DownloadOs::Linux {
-            rsx! {
-                div { style: "margin-top: 16px;",
-                    p { style: "color: var(--muted); font-size: 0.9rem; text-align: center;",
+        let bottom_content = rsx! {
+            if selected() != DownloadOs::Linux {
+                button {
+                    class: "primary-btn download-confirm-btn",
+                    onclick: move |_| {
+                        let url = download_url(selected());
+                        let filename = filename_from_url(url);
+                        download_file(url, filename);
+                    },
+                    if lang == Language::English {
+                        "Download"
+                    } else {
+                        "Скачать"
+                    }
+                }
+            }
+            // Mac specific instructions (visible only when MacOS is selected)
+            if selected() == DownloadOs::MacOS {
+                div { class: "mac-instructions",
+                    p { class: "mac-instructions-title",
                         if lang == Language::English {
-                            "Install Rust, then run:"
+                            "After downloading:"
                         } else {
-                            "Установите Rust, затем выполните:"
+                            "После загрузки:"
                         }
                     }
-                    div { style: "background: var(--input-bg); border-radius: 12px; border: 1px solid var(--border); padding: 12px 16px; margin-bottom: 8px;",
-                        code { style: "color: var(--text); font-size: 0.85rem; word-break: break-all; user-select: all;",
-                            "{install_rust_command}"
+                    p { class: "mac-instructions-step",
+                        if lang == Language::English {
+                            "1. Open the .dmg, drag the app to Applications"
+                        } else {
+                            "1. Откройте .dmg, перетащите приложение в Applications"
                         }
                     }
-                    div { style: "background: var(--input-bg); border-radius: 12px; border: 1px solid var(--border); padding: 12px 16px;",
-                        code { style: "color: var(--text); font-size: 0.85rem; word-break: break-all; user-select: all;",
-                            "{install_app_command}"
+                    p { class: "mac-instructions-step",
+                        if lang == Language::English {
+                            "2. Open Terminal, type: xattr -cr"
+                        } else {
+                            "2. Откройте Терминал, введите: xattr -cr"
+                        }
+                    }
+                    p { class: "mac-instructions-step",
+                        if lang == Language::English {
+                            "3. Drag the app into Terminal, press Enter"
+                        } else {
+                            "3. Перетащите приложение в Терминал, нажмите Enter"
+                        }
+                    }
+                    p { class: "mac-instructions-step",
+                        if lang == Language::English {
+                            "4. Now you can use it"
+                        } else {
+                            "4. Теперь можно пользоваться"
                         }
                     }
                 }
             }
-            .unwrap()
-        } else {
-            rsx! {
-                div {
-                    button {
-                        class: "primary-btn download-confirm-btn",
-                        onclick: move |_| {
-                            let url = download_url(selected());
-                            let filename = filename_from_url(url);
-                            download_file(url, filename);
-                        },
-                        if lang == Language::English {
-                            "Download"
-                        } else {
-                            "Скачать"
-                        }
-                    }
-                    // Mac instructions
-                    if selected() == DownloadOs::MacOS {
-                        div { style: "margin-top: 12px; padding: 12px; background: var(--input-bg); border-radius: 12px; border: 1px solid var(--border);",
-                            p { style: "color: var(--muted); font-size: 0.85rem; margin: 0 0 8px 0; font-weight: 700;",
-                                if lang == Language::English {
-                                    "After downloading:"
-                                } else {
-                                    "После загрузки:"
-                                }
-                            }
-                            p { style: "color: var(--text); font-size: 0.85rem; margin: 0 0 4px 0;",
-                                if lang == Language::English {
-                                    "1. Open YarikWeather-MacOS.dmg file, drag YarikWeather.app into applications folder"
-                                } else {
-                                    "1. Откройте YarikWeather-MacOS.dmg файл, перетащите YarikWeather.app в папку приложения"
-                                }
-                            }
-                            p { style: "color: var(--text); font-size: 0.85rem; margin: 0 0 4px 0;",
-                                if lang == Language::English {
-                                    "2. Open Terminal"
-                                } else {
-                                    "2. Откройте Терминал"
-                                }
-                            }
-                            p { style: "color: var(--text); font-size: 0.85rem; margin: 0 0 4px 0;",
-                                if lang == Language::English {
-                                    "3. Type: xattr -cr (space)"
-                                } else {
-                                    "3. Введите: xattr -cr (пробел)"
-                                }
-                            }
-                            p { style: "color: var(--text); font-size: 0.85rem; margin: 0 0 4px 0;",
-                                if lang == Language::English {
-                                    "4. Drag the app into Terminal and press Enter"
-                                } else {
-                                    "4. Перетащите приложение в Терминал и нажмите Enter"
-                                }
-                            }
-                            p { style: "color: var(--text); font-size: 0.85rem; margin: 0 0 4px 0;",
-                                if lang == Language::English {
-                                    "5. Now you can use it"
-                                } else {
-                                    "5. Теперь можно пользоваться"
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-            .unwrap()
         };
 
         rsx! {
@@ -232,8 +224,8 @@ mod inner {
                             "Выберите платформу и скачайте приложение."
                         }
                     }
-                    {download_grid}
-                    {action_area}
+                    div { class: "download-scroll", {scroll_content} }
+                    div { class: "download-actions", {bottom_content} }
                 }
             }
         }

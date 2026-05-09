@@ -235,15 +235,15 @@ pub fn convert_pressure(hpa: f64, unit: &PressureUnit) -> f64 {
 
 pub fn uv_category(uv: f64) -> &'static str {
     if uv < 3.0 {
-        "Low"
+        "Low(m)"
     } else if uv < 6.0 {
-        "Moderate"
+        "Moderate(m)"
     } else if uv < 8.0 {
-        "High"
+        "High(m)"
     } else if uv < 11.0 {
-        "Very High"
+        "Very High(m)"
     } else {
-        "Extreme"
+        "Extreme(m)"
     }
 }
 
@@ -284,7 +284,7 @@ pub fn translate_category(cat: &str, lang: &Language) -> String {
         "Moderate" => "Умеренная".into(),
         "High" => "Высокая".into(),
         "Very High" => "Очень высокая".into(),
-        "Extreme" => "Чрезмерная".into(),
+        "Extreme" => "Экстремальная".into(),
         "Comfortable" => "Комфортная".into(),
         "Normal" => "Нормальное".into(),
         "Calm" => "Штиль".into(),
@@ -292,6 +292,11 @@ pub fn translate_category(cat: &str, lang: &Language) -> String {
         "Fresh" => "Свежий".into(),
         "Strong" => "Сильный".into(),
         "Gale+" => "Шторм".into(),
+        "Low(m)" => "Низкий".into(),
+        "Moderate(m)" => "Средний".into(),
+        "High(m)" => "Высокий".into(),
+        "Very High(m)" => "Очень высокий".into(),
+        "Extreme(m)" => "Экстремальный".into(),
         _ => cat.to_string(),
     }
 }

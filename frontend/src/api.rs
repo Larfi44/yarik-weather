@@ -4,7 +4,7 @@ use crate::types::WeatherResponse;
 #[cfg(target_arch = "wasm32")]
 use gloo_net::http::Request;
 
-pub const API_URL: &str = "https://functions.yandexcloud.net/d4ejjs1qt2b6v625aknb?city";
+pub const API_URL: &str = "https://bba456glbns2mjqupmls.containers.yandexcloud.net?city";
 
 pub async fn fetch_weather(
     city: &str,
