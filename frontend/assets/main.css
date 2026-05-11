@@ -1010,3 +1010,22 @@ body {
     word-break: break-all;
     user-select: all;
 }
+
+.ai-modal-title {
+    font-size: 30px;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 1.25rem;
+    font-weight: 600;
+}
+
+.ai-logo-icon {
+    width: 1.8em;
+    height: 1.8em;
+    display: block;
+}
+
+.ai-modal-title span {
+    line-height: 1;
+}

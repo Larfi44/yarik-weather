@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 
 pub const SETTINGS_KEY: &str = "weather_settings";
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
 pub enum Language {
     English,
     Russian,

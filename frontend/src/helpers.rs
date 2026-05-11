@@ -235,15 +235,15 @@ pub fn convert_pressure(hpa: f64, unit: &PressureUnit) -> f64 {
 
 pub fn uv_category(uv: f64) -> &'static str {
     if uv < 3.0 {
-        "Low(m)"
+        "Low"
     } else if uv < 6.0 {
-        "Moderate(m)"
+        "Moderate"
     } else if uv < 8.0 {
-        "High(m)"
+        "High"
     } else if uv < 11.0 {
-        "Very High(m)"
+        "Very High"
     } else {
-        "Extreme(m)"
+        "Extreme"
     }
 }
 
@@ -271,7 +271,7 @@ pub fn wind_category(ms: f64) -> &'static str {
     } else if ms < 13.9 {
         "Strong"
     } else {
-        "Gale+"
+        "Storm"
     }
 }
 
@@ -280,23 +280,18 @@ pub fn translate_category(cat: &str, lang: &Language) -> String {
         return cat.to_string();
     }
     match cat {
-        "Low" => "Низкая".into(),
-        "Moderate" => "Умеренная".into(),
-        "High" => "Высокая".into(),
-        "Very High" => "Очень высокая".into(),
-        "Extreme" => "Экстремальная".into(),
+        "Low" => "Низкий".into(),
+        "Moderate" => "Средний".into(),
+        "High" => "Высокий".into(),
+        "Very High" => "Очень высокий".into(),
+        "Extreme" => "Экстремальный".into(),
         "Comfortable" => "Комфортная".into(),
         "Normal" => "Нормальное".into(),
         "Calm" => "Штиль".into(),
         "Light" => "Лёгкий".into(),
-        "Fresh" => "Свежий".into(),
+        "Fresh" => "Средний".into(),
         "Strong" => "Сильный".into(),
-        "Gale+" => "Шторм".into(),
-        "Low(m)" => "Низкий".into(),
-        "Moderate(m)" => "Средний".into(),
-        "High(m)" => "Высокий".into(),
-        "Very High(m)" => "Очень высокий".into(),
-        "Extreme(m)" => "Экстремальный".into(),
+        "Storm" => "Шторм".into(),
         _ => cat.to_string(),
     }
 }
@@ -422,6 +417,8 @@ const COASTAL_CITIES_EN: &[&str] = &[
     "Mombasa",
     "Casablanca",
     "Tel Aviv",
+    "Odessa",
+    "Odesa",
 ];
 
 const COASTAL_CITIES_RU: &[&str] = &[
@@ -493,6 +490,7 @@ const COASTAL_CITIES_RU: &[&str] = &[
     "Партенит",
     "Коктебель",
     "Орджоникидзе",
+    "Мариуполь",
     // World (50)
     "Майами",
     "Лос-Анджелес",
@@ -544,6 +542,7 @@ const COASTAL_CITIES_RU: &[&str] = &[
     "Момбаса",
     "Касабланка",
     "Тель-Авив",
+    "Одесса",
 ];
 
 /// Returns true if the city is known to be coastal (checks both English and Russian names).
@@ -554,4 +553,27 @@ pub fn is_coastal_city(city: &str) -> bool {
         || COASTAL_CITIES_RU
             .iter()
             .any(|c| c.to_lowercase() == city.to_lowercase())
+}
+
+pub fn get_approx_lat(city: &str) -> f64 {
+    match city.to_lowercase().as_str() {
+        "moscow" => 55.75,
+        "london" => 51.51,
+        "sochi" => 43.59,
+        "vladivostok" => 43.13,
+        "saint petersburg" | "st. petersburg" => 59.93,
+        // add more cities as needed
+        _ => 50.0,
+    }
+}
+
+pub fn get_approx_lon(city: &str) -> f64 {
+    match city.to_lowercase().as_str() {
+        "moscow" => 37.61,
+        "london" => -0.13,
+        "sochi" => 39.72,
+        "vladivostok" => 131.89,
+        "saint petersburg" | "st. petersburg" => 30.34,
+        _ => 10.0,
+    }
 }

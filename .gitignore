@@ -5,7 +5,6 @@ Thumbs.db
 # IDE files
 .vscode/
 .idea/
-.gigaide
 *.swp
 *.swo
 

@@ -46,4 +46,6 @@ pub struct WeatherResponse {
     pub hourly: Vec<HourlyData>,
     pub yesterday: DailyData,
     pub forecast: Vec<DailyData>,
+    pub local_yesterday: String,
+    pub local_today: String,
 }
