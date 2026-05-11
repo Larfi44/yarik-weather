@@ -1,14 +1,266 @@
 use axum::{
     Router,
-    extract::Query,
+    extract::{Query, State},
     http::StatusCode,
     response::{IntoResponse, Json},
     routing::get,
 };
 use chrono::NaiveDate;
+use chrono_tz::Tz;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, sync::Arc};
+
+// ---------- Coastal city lists ----------
+const COASTAL_CITIES_EN: &[&str] = &[
+    // Russia
+    "Sochi",
+    "Vladivostok",
+    "Kaliningrad",
+    "Murmansk",
+    "Arkhangelsk",
+    "Saint Petersburg",
+    "St. Petersburg",
+    "Novorossiysk",
+    "Anapa",
+    "Gelendzhik",
+    "Tuapse",
+    "Nakhodka",
+    "Magadan",
+    "Petropavlovsk-Kamchatsky",
+    "Yuzhno-Sakhalinsk",
+    "Korsakov",
+    "Kholmsk",
+    "Vanino",
+    "Sovetskaya Gavan",
+    "Dudinka",
+    "Tiksi",
+    "Pevek",
+    "Anadyr",
+    "Provideniya",
+    "Vysotsk",
+    "Primorsk",
+    "Baltiysk",
+    "Svetly",
+    "Ladushkin",
+    "Mamonovo",
+    "Pionersky",
+    "Zelenogradsk",
+    "Svetlogorsk",
+    "Yantarny",
+    "Kandalaksha",
+    "Severomorsk",
+    "Polyarny",
+    "Gadzhiyevo",
+    "Zaozersk",
+    "Vidyayevo",
+    "Ostrovnoy",
+    "Naryan-Mar",
+    "Amderma",
+    "Dikson",
+    "Khatanga",
+    "Chokurdakh",
+    "Nizhneyansk",
+    "Ambarchik",
+    "Egvekinot",
+    "Lavrentiya",
+    "Uelen",
+    // Crimea
+    "Sevastopol",
+    "Yalta",
+    "Alushta",
+    "Sudak",
+    "Feodosia",
+    "Kerch",
+    "Yevpatoria",
+    "Saki",
+    "Chernomorskoe",
+    "Balaklava",
+    "Foros",
+    "Gurzuf",
+    "Partenit",
+    "Koktebel",
+    "Ordzhonikidze",
+    // World
+    "Miami",
+    "Los Angeles",
+    "San Francisco",
+    "Rio de Janeiro",
+    "Sydney",
+    "Melbourne",
+    "Cape Town",
+    "Barcelona",
+    "Valencia",
+    "Malaga",
+    "Lisbon",
+    "Porto",
+    "Rome",
+    "Naples",
+    "Athens",
+    "Istanbul",
+    "Antalya",
+    "Dubai",
+    "Mumbai",
+    "Chennai",
+    "Bangkok",
+    "Hong Kong",
+    "Tokyo",
+    "Osaka",
+    "Busan",
+    "Vancouver",
+    "Halifax",
+    "Reykjavik",
+    "Copenhagen",
+    "Stockholm",
+    "Helsinki",
+    "Oslo",
+    "London",
+    "Amsterdam",
+    "Jakarta",
+    "Manila",
+    "Lima",
+    "Santiago",
+    "Buenos Aires",
+    "Montevideo",
+    "Perth",
+    "Wellington",
+    "Cancun",
+    "Nassau",
+    "Honolulu",
+    "Acapulco",
+    "Dar es Salaam",
+    "Mombasa",
+    "Casablanca",
+    "Tel Aviv",
+];
+
+const COASTAL_CITIES_RU: &[&str] = &[
+    "Сочи",
+    "Владивосток",
+    "Калининград",
+    "Мурманск",
+    "Архангельск",
+    "Санкт-Петербург",
+    "Санкт-Петербург",
+    "Новороссийск",
+    "Анапа",
+    "Геленджик",
+    "Туапсе",
+    "Находка",
+    "Магадан",
+    "Петропавловск-Камчатский",
+    "Южно-Сахалинск",
+    "Корсаков",
+    "Холмск",
+    "Ванино",
+    "Советская Гавань",
+    "Дудинка",
+    "Тикси",
+    "Певек",
+    "Анадырь",
+    "Провидения",
+    "Высоцк",
+    "Приморск",
+    "Балтийск",
+    "Светлый",
+    "Ладушкин",
+    "Мамоново",
+    "Пионерский",
+    "Зеленоградск",
+    "Светлогорск",
+    "Янтарный",
+    "Кандалакша",
+    "Североморск",
+    "Полярный",
+    "Гаджиево",
+    "Заозёрск",
+    "Видяево",
+    "Островной",
+    "Нарьян-Мар",
+    "Амдерма",
+    "Диксон",
+    "Хатанга",
+    "Чокурдах",
+    "Нижнеянск",
+    "Амбарчик",
+    "Эгвекинот",
+    "Лаврентия",
+    "Уэлен",
+    "Севастополь",
+    "Ялта",
+    "Алушта",
+    "Судак",
+    "Феодосия",
+    "Керчь",
+    "Евпатория",
+    "Саки",
+    "Черноморское",
+    "Балаклава",
+    "Форос",
+    "Гурзуф",
+    "Партенит",
+    "Коктебель",
+    "Орджоникидзе",
+    "Майами",
+    "Лос-Анджелес",
+    "Сан-Франциско",
+    "Рио-де-Жанейро",
+    "Сидней",
+    "Мельбурн",
+    "Кейптаун",
+    "Барселона",
+    "Валенсия",
+    "Малага",
+    "Лиссабон",
+    "Порту",
+    "Рим",
+    "Неаполь",
+    "Афины",
+    "Стамбул",
+    "Анталья",
+    "Дубай",
+    "Мумбаи",
+    "Ченнаи",
+    "Бангкок",
+    "Гонконг",
+    "Токио",
+    "Осака",
+    "Пусан",
+    "Ванкувер",
+    "Галифакс",
+    "Рейкьявик",
+    "Копенгаген",
+    "Стокгольм",
+    "Хельсинки",
+    "Осло",
+    "Лондон",
+    "Амстердам",
+    "Джакарта",
+    "Манила",
+    "Лима",
+    "Сантьяго",
+    "Буэнос-Айрес",
+    "Монтевидео",
+    "Перт",
+    "Веллингтон",
+    "Канкун",
+    "Нассау",
+    "Гонолулу",
+    "Акапулько",
+    "Дар-эс-Салам",
+    "Момбаса",
+    "Касабланка",
+    "Тель-Авив",
+];
+
+fn is_coastal_city(city: &str) -> bool {
+    COASTAL_CITIES_EN
+        .iter()
+        .any(|c| c.eq_ignore_ascii_case(city))
+        || COASTAL_CITIES_RU
+            .iter()
+            .any(|c| c.to_lowercase() == city.to_lowercase())
+}
 
 // ---------- Structs matching the frontend ----------
 
@@ -23,6 +275,8 @@ struct CurrentData {
     sea_temperature: Option<f64>,
     uv_index: f64,
     precipitation_probability: f64,
+    #[serde(skip)]
+    latitude: Option<f64>, // stored for AI, not serialized
 }
 
 #[derive(Debug, Serialize)]
@@ -68,6 +322,8 @@ struct WeatherResponse {
     hourly: Vec<HourlyData>,
     yesterday: DailyData,
     forecast: Vec<DailyData>,
+    local_today: String,
+    local_yesterday: String,
 }
 
 // ---------- Open‑Meteo API structures ----------
@@ -130,6 +386,7 @@ struct OpenMeteoForecast {
     current: OpenMeteoCurrent,
     hourly: OpenMeteoHourly,
     daily: OpenMeteoDaily,
+    timezone: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -147,6 +404,16 @@ struct OpenMeteoArchiveDaily {
 }
 
 // ---------- Helpers ----------
+
+fn local_today_date(iana_tz: &str) -> (String, String) {
+    let tz: Tz = iana_tz.parse().unwrap_or(chrono_tz::UTC);
+    let local_now = chrono::Utc::now().with_timezone(&tz);
+    let today = local_now.format("%Y-%m-%d").to_string();
+    let yesterday = (local_now - chrono::Duration::days(1))
+        .format("%Y-%m-%d")
+        .to_string();
+    (yesterday, today)
+}
 
 fn weather_description(code: i64) -> String {
     match code {
@@ -191,32 +458,23 @@ fn moon_phase_for_date(date: NaiveDate) -> (String, f64) {
         .unwrap();
     let target = date.and_hms_opt(0, 0, 0).unwrap();
     let days_since_reference = (target - reference).num_hours() as f64 / 24.0;
-
-    let age = days_since_reference % synodic_month;
-    let age = if age < 0.0 { age + synodic_month } else { age };
-
+    let mut age = days_since_reference % synodic_month;
+    if age < 0.0 {
+        age += synodic_month;
+    }
     let illumination = ((1.0 - (2.0 * std::f64::consts::PI * age / synodic_month).cos()) / 2.0
         * 100.0)
         .clamp(0.0, 100.0);
-
-    let phase_name = if age < 1.84566 {
-        "New Moon"
-    } else if age < 5.53699 {
-        "Waxing Crescent"
-    } else if age < 9.22831 {
-        "First Quarter"
-    } else if age < 12.91963 {
-        "Waxing Gibbous"
-    } else if age < 16.61096 {
-        "Full Moon"
-    } else if age < 20.30228 {
-        "Waning Gibbous"
-    } else if age < 23.99361 {
-        "Last Quarter"
-    } else {
-        "Waning Crescent"
+    let phase_name = match age {
+        a if a < 1.84566 => "New Moon",
+        a if a < 5.53699 => "Waxing Crescent",
+        a if a < 9.22831 => "First Quarter",
+        a if a < 12.91963 => "Waxing Gibbous",
+        a if a < 16.61096 => "Full Moon",
+        a if a < 20.30228 => "Waning Gibbous",
+        a if a < 23.99361 => "Last Quarter",
+        _ => "Waning Crescent",
     };
-
     (phase_name.to_string(), illumination)
 }
 
@@ -226,11 +484,7 @@ async fn fetch_json<T: serde::de::DeserializeOwned>(
 ) -> anyhow::Result<T> {
     let resp = client.get(url).send().await?;
     if !resp.status().is_success() {
-        return Err(anyhow::anyhow!(
-            "API error: {} {}",
-            resp.status().as_u16(),
-            resp.status().canonical_reason().unwrap_or("")
-        ));
+        return Err(anyhow::anyhow!("API error: {}", resp.status()));
     }
     Ok(resp.json().await?)
 }
@@ -241,12 +495,10 @@ async fn get_coordinates(client: &Client, city: &str) -> anyhow::Result<(f64, f6
         .chars()
         .any(|c| c as u32 > 0x0400 && c as u32 <= 0x04FF);
     let lang = if has_cyrillic { "ru" } else { "en" };
-
     let api_url = format!(
         "https://geocoding-api.open-meteo.com/v1/search?name={}&count=1&language={}&format=json",
         encoded, lang
     );
-
     let result: GeocodingResponse = fetch_json(client, &api_url).await?;
     let results = result.results.unwrap_or_default();
     if results.is_empty() {
@@ -256,11 +508,12 @@ async fn get_coordinates(client: &Client, city: &str) -> anyhow::Result<(f64, f6
 }
 
 async fn fetch_forecast(client: &Client, lat: f64, lon: f64) -> anyhow::Result<OpenMeteoForecast> {
-    let url = format!(
-        "https://api.open-meteo.com/v1/forecast?latitude={:.4}&longitude={:.4}&current=temperature_2m,wind_speed_10m,weather_code,surface_pressure,sea_surface_temperature,uv_index&\
-         hourly=temperature_2m,wind_speed_10m,weather_code,surface_pressure,sea_surface_temperature,uv_index,precipitation_probability&\
-         daily=temperature_2m_max,temperature_2m_min,wind_speed_10m_max,weather_code,sunrise,sunset,precipitation_probability_max&\
-         timezone=auto",
+    let url: String = format!(
+        "https://api.open-meteo.com/v1/forecast?latitude={:.4}&longitude={:.4}&\
+    current=temperature_2m,wind_speed_10m,weather_code,surface_pressure,sea_surface_temperature,uv_index&\
+    hourly=temperature_2m,wind_speed_10m,weather_code,surface_pressure,sea_surface_temperature,uv_index,precipitation_probability&\
+    daily=temperature_2m_max,temperature_2m_min,wind_speed_10m_max,weather_code,sunrise,sunset,uv_index_max,precipitation_probability_max&\
+    timezone=auto&forecast_days=8",
         lat, lon
     );
     fetch_json(client, &url).await
@@ -269,20 +522,16 @@ async fn fetch_forecast(client: &Client, lat: f64, lon: f64) -> anyhow::Result<O
 async fn fetch_yesterday(client: &Client, lat: f64, lon: f64) -> anyhow::Result<DailyData> {
     let yesterday = chrono::Utc::now().date_naive() - chrono::TimeDelta::days(1);
     let date_str = yesterday.format("%Y-%m-%d").to_string();
-
     let url = format!(
         "https://archive-api.open-meteo.com/v1/archive?latitude={:.4}&longitude={:.4}&start_date={}&end_date={}&\
-         daily=temperature_2m_max,temperature_2m_min,wind_speed_10m_max,weather_code&timezone=auto",
+        daily=temperature_2m_max,temperature_2m_min,wind_speed_10m_max,weather_code&timezone=auto",
         lat, lon, date_str, date_str
     );
-
     let archive: OpenMeteoArchive = fetch_json(client, &url).await?;
     if archive.daily.time.is_empty() {
-        return Err(anyhow::anyhow!("no historical data available"));
+        return Err(anyhow::anyhow!("no historical data"));
     }
-
     let (moon_name, moon_illum) = moon_phase_for_date(yesterday);
-
     Ok(DailyData {
         date: archive.daily.time[0].clone(),
         temperature_max: archive.daily.temperature_2m_max[0],
@@ -300,30 +549,31 @@ async fn fetch_yesterday(client: &Client, lat: f64, lon: f64) -> anyhow::Result<
 
 async fn get_weather_data(client: &Client, city: &str) -> anyhow::Result<WeatherResponse> {
     let (lat, lon) = get_coordinates(client, city).await?;
-
+    let latitude = lat; // store for AI
     let (forecast_res, yesterday_res) = tokio::join!(
         fetch_forecast(client, lat, lon),
         fetch_yesterday(client, lat, lon)
     );
-
     let forecast = forecast_res?;
+    let iana_tz = forecast
+        .timezone
+        .clone()
+        .unwrap_or_else(|| "UTC".to_string());
+    let (yesterday_str, today_str) = local_today_date(&iana_tz);
     let yesterday = yesterday_res?;
-
     if forecast.daily.time.is_empty() {
-        return Err(anyhow::anyhow!("no daily forecast data"));
+        return Err(anyhow::anyhow!("no daily forecast"));
     }
     if forecast.hourly.time.is_empty() {
-        return Err(anyhow::anyhow!("no hourly forecast data"));
+        return Err(anyhow::anyhow!("no hourly forecast"));
     }
 
-    // Current
     let today_precip = forecast
         .daily
         .precipitation_probability_max
         .as_ref()
         .and_then(|v| v.first().copied())
         .unwrap_or(0.0);
-
     let current = CurrentData {
         temperature: forecast.current.temperature_2m,
         wind_speed: forecast.current.wind_speed_10m,
@@ -332,24 +582,43 @@ async fn get_weather_data(client: &Client, city: &str) -> anyhow::Result<Weather
         sea_temperature: forecast.current.sea_surface_temperature,
         uv_index: forecast.current.uv_index,
         precipitation_probability: today_precip,
+        latitude: Some(latitude),
     };
 
-    // Hourly: skip today, max 6 days (6*24 = 144 entries)
     let mut hourly = Vec::new();
-    if let Some(first_time) = forecast.hourly.time.first() {
-        let today_date = first_time.split('T').next().unwrap_or("");
-        let max_entries = 6 * 24;
+    if !forecast.hourly.time.is_empty() {
+        let max_days = 9;
+        let max_entries = max_days * 24;
+        let mut added_dates = std::collections::HashSet::new();
         let mut count = 0;
+
         for (i, time_str) in forecast.hourly.time.iter().enumerate() {
             if count >= max_entries {
                 break;
             }
+
             let parts: Vec<&str> = time_str.split('T').collect();
             let date_only = parts[0];
-            if date_only == today_date {
+
+            // Keep only yesterday (local), today (local) and future dates
+            if date_only < yesterday_str.as_str() {
                 continue;
             }
-            let time_only = parts.get(1).map(|t| &t[..5.min(t.len())]).unwrap_or("");
+            if date_only > today_str.as_str() {
+                // future day – okay
+            } else if date_only == today_str.as_str() || date_only == yesterday_str.as_str() {
+                // always include full today and full yesterday
+            } else {
+                continue;
+            }
+
+            // Limit to 6 distinct dates
+            if added_dates.len() >= max_days && !added_dates.contains(date_only) {
+                continue;
+            }
+            added_dates.insert(date_only.to_string());
+
+            let time_only = parts.get(1).map(|t| &t[..5]).unwrap_or("");
 
             let sea_temp = forecast
                 .hourly
@@ -379,13 +648,11 @@ async fn get_weather_data(client: &Client, city: &str) -> anyhow::Result<Weather
         }
     }
 
-    // Daily forecast
     let mut forecast_days = Vec::new();
     for i in 0..forecast.daily.time.len() {
         let parsed_date = NaiveDate::parse_from_str(&forecast.daily.time[i], "%Y-%m-%d")
             .unwrap_or_else(|_| NaiveDate::from_ymd_opt(1970, 1, 1).unwrap());
         let (moon_name, moon_illum) = moon_phase_for_date(parsed_date);
-
         let sunrise = forecast
             .daily
             .sunrise
@@ -396,14 +663,12 @@ async fn get_weather_data(client: &Client, city: &str) -> anyhow::Result<Weather
             .sunset
             .as_ref()
             .and_then(|v| v.get(i).cloned());
-
         let precip_max = forecast
             .daily
             .precipitation_probability_max
             .as_ref()
             .and_then(|v| v.get(i).copied())
             .unwrap_or(0.0);
-
         forecast_days.push(DailyData {
             date: forecast.daily.time[i].clone(),
             temperature_max: forecast.daily.temperature_2m_max[i],
@@ -425,26 +690,38 @@ async fn get_weather_data(client: &Client, city: &str) -> anyhow::Result<Weather
         hourly,
         yesterday,
         forecast: forecast_days,
+        local_today: today_str,
+        local_yesterday: yesterday_str,
     })
 }
 
-// ---------- Request handler ----------
-async fn handler(
+// ---------- AppState ----------
+struct AppState {
+    client: Arc<Client>,
+}
+
+// ---------- Handlers ----------
+async fn weather_handler(
     Query(params): Query<HashMap<String, String>>,
-    axum::extract::State(client): axum::extract::State<Arc<Client>>,
+    State(state): State<Arc<AppState>>,
 ) -> Result<Json<WeatherResponse>, AppError> {
     let city = params
         .get("city")
-        .ok_or_else(|| AppError::BadRequest("Missing 'city' query parameter".into()))?;
-
-    let weather = get_weather_data(&client, city).await?;
+        .ok_or_else(|| AppError::BadRequest("Missing city".into()))?;
+    let weather = get_weather_data(&state.client, city).await?;
     Ok(Json(weather))
 }
 
-// ---------- Custom error type ----------
+// ---------- Error types ----------
 enum AppError {
     BadRequest(String),
     Internal(anyhow::Error),
+}
+
+impl From<reqwest::Error> for AppError {
+    fn from(err: reqwest::Error) -> Self {
+        AppError::Internal(err.into())
+    }
 }
 
 impl From<anyhow::Error> for AppError {
@@ -463,25 +740,25 @@ impl IntoResponse for AppError {
     }
 }
 
-// ---------- Main server setup ----------
+// ---------- Main ----------
 #[tokio::main]
 async fn main() {
     let client = Client::new();
+    let app_state = Arc::new(AppState {
+        client: Arc::new(client),
+    });
 
-    // Read the port from the environment (default to 8080 if not set)
-    let port = std::env::var("PORT").unwrap_or_else(|_| "8080".to_string());
+    let port = std::env::var("PORT").unwrap_or_else(|_| "8081".to_string());
     let bind_addr = format!("0.0.0.0:{}", port);
 
-    // CORS layer (permissive)
     let cors = tower_http::cors::CorsLayer::new()
         .allow_origin(tower_http::cors::Any)
         .allow_methods(tower_http::cors::Any)
         .allow_headers(tower_http::cors::Any);
 
     let app = Router::new()
-        .route("/", get(handler))
+        .route("/", get(weather_handler))
         .layer(cors)
-        // Catch panics and return 500 JSON error
         .layer(tower_http::catch_panic::CatchPanicLayer::custom(
             |err: Box<dyn std::any::Any + Send + 'static>| {
                 let message = if let Some(s) = err.downcast_ref::<String>() {
@@ -498,7 +775,7 @@ async fn main() {
                     .into_response()
             },
         ))
-        .with_state(Arc::new(client));
+        .with_state(app_state);
 
     println!("Server binding to {}", bind_addr);
     let listener = tokio::net::TcpListener::bind(&bind_addr).await.unwrap();

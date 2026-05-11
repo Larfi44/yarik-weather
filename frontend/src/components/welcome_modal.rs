@@ -162,7 +162,11 @@ pub fn WelcomeModal(
                                 temp_settings.write().pressure_unit = PressureUnit::HPa;
                                 notify_change();
                             },
-                            "hPa"
+                            if lang == Language::English {
+                                "hPa"
+                            } else {
+                                "гПа"
+                            }
                         }
                         button {
                             class: choice_btn_class(temp_settings().pressure_unit == PressureUnit::MmHg),
@@ -170,7 +174,11 @@ pub fn WelcomeModal(
                                 temp_settings.write().pressure_unit = PressureUnit::MmHg;
                                 notify_change();
                             },
-                            "mmHg"
+                            if lang == Language::English {
+                                "mmHg"
+                            } else {
+                                "мм. рт. ст."
+                            }
                         }
                         button {
                             class: choice_btn_class(temp_settings().pressure_unit == PressureUnit::InHg),
@@ -178,7 +186,11 @@ pub fn WelcomeModal(
                                 temp_settings.write().pressure_unit = PressureUnit::InHg;
                                 notify_change();
                             },
-                            "inHg"
+                            if lang == Language::English {
+                                "inHg"
+                            } else {
+                                "дюйм рт. ст."
+                            }
                         }
                     }
                 }

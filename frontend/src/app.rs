@@ -1,6 +1,7 @@
 #![allow(warnings)]
 
 use crate::api::fetch_weather;
+use crate::components::ai_modal::AiModal;
 #[cfg(target_arch = "wasm32")]
 use crate::components::download_modal::DownloadModal;
 use crate::components::search_bar::SearchBar;
@@ -89,6 +90,7 @@ pub fn App() -> Element {
     let error = use_signal(|| None::<String>);
     let mut show_settings = use_signal(|| false);
     let mut show_welcome = use_signal(|| settings().first_time);
+    let mut show_ai_modal = use_signal(|| false);
     let mut show_downloads = use_signal(|| false);
     let mut initial_fetch_done = use_signal(|| false);
     let lang: Language = settings().language.clone();
@@ -153,7 +155,15 @@ pub fn App() -> Element {
                             },
                             {theme_icon(settings().theme)}
                         }
-                        // Download button – only on web
+                        button {
+                            style: match resolved_theme {
+                                Theme::Light => "color: blue",
+                                _ => "color: cyan",
+                            },
+                            class: "icon-btn",
+                            onclick: move |_| show_ai_modal.set(true),
+                            "AI"
+                        }
                         {
                             #[cfg(target_arch = "wasm32")]
                             {
@@ -286,6 +296,14 @@ pub fn App() -> Element {
                         on_change: move |new_settings: UserSettings| {
                             settings.set(new_settings);
                         },
+                    }
+                }
+                if show_ai_modal() {
+                    AiModal {
+                        weather: weather(),
+                        lang: settings().language.clone(),
+                        temp_unit: settings().temp_unit.clone(),
+                        on_close: move |_| show_ai_modal.set(false),
                     }
                 }
             }

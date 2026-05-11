@@ -21,8 +21,42 @@ use crate::types::DailyData;
 use crate::types::HourlyData;
 use crate::types::WeatherResponse;
 
+use chrono::Datelike;
 use chrono::Local;
 use dioxus::prelude::*;
+
+/// Calculate the difference in days between two dates (to - from).
+fn day_offset(from_date: &str, to_date: &str) -> Option<i64> {
+    use chrono::NaiveDate;
+    let from = NaiveDate::parse_from_str(from_date, "%Y-%m-%d").ok()?;
+    let to = NaiveDate::parse_from_str(to_date, "%Y-%m-%d").ok()?;
+    Some((to - from).num_days())
+}
+
+/// Format a day label like "15 May (Mon)" or "15 мая (Пн)".
+fn format_day_label(date_str: &str, lang: &Language) -> String {
+    use chrono::NaiveDate;
+    if let Ok(date) = NaiveDate::parse_from_str(date_str, "%Y-%m-%d") {
+        let day = date.format("%d").to_string();
+        let month_num = date.format("%m").to_string().parse::<u32>().unwrap_or(1);
+        let month_name = if *lang == Language::English {
+            crate::helpers::month_name_en(month_num)
+        } else {
+            crate::helpers::month_name_ru(month_num)
+        };
+        let weekday_num = date.weekday().num_days_from_monday(); // 0 = Monday
+        let weekday_en = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+        let weekday_ru = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"];
+        let weekday = if *lang == Language::English {
+            weekday_en[weekday_num as usize]
+        } else {
+            weekday_ru[weekday_num as usize]
+        };
+        format!("{} {} ({})", day, month_name, weekday)
+    } else {
+        date_str.to_string()
+    }
+}
 
 #[component]
 pub fn WeatherDisplay(
@@ -91,35 +125,17 @@ pub fn WeatherDisplay(
     };
     let min_line_opacity: f64 = if theme == Theme::Light { 1.0 } else { 0.5 };
 
-    // ---- Hourly: yesterday → day 5 ----
-    let mut selected_hourly_day = use_signal(|| 1_i32);
-
+    // ---- Hourly chart: Yesterday → Today → Tomorrow … ----
     let mut hourly_by_day: Vec<Vec<&HourlyData>> = Vec::new();
-
-    // Add yesterday's data first
-    let yesterday_date = data.yesterday.date.clone();
-    let yesterday_data: Vec<HourlyData> = data
-        .hourly
-        .iter()
-        .filter(|h| h.date == yesterday_date)
-        .cloned()
-        .collect();
-    if !yesterday_data.is_empty() {
-        hourly_by_day.push(yesterday_data.iter().collect());
-    }
-
-    let mut groups: Vec<Vec<&HourlyData>> = Vec::new();
     let mut current_date: Option<&str> = None;
     let mut current_group = Vec::new();
+
     for h in &data.hourly {
-        if h.date == yesterday_date {
-            continue;
-        }
         match current_date {
             Some(d) if d == h.date => {}
             _ => {
                 if !current_group.is_empty() {
-                    groups.push(current_group);
+                    hourly_by_day.push(current_group);
                 }
                 current_group = Vec::new();
                 current_date = Some(&h.date);
@@ -128,59 +144,46 @@ pub fn WeatherDisplay(
         current_group.push(h);
     }
     if !current_group.is_empty() {
-        groups.push(current_group);
+        hourly_by_day.push(current_group);
     }
 
-    for group in groups {
-        hourly_by_day.push(group);
-    }
-    hourly_by_day.truncate(6);
+    let hourly_max_index = hourly_by_day.len().saturating_sub(1) as i32;
 
-    let day_labels: Vec<String> = (0..6)
-        .map(|i| match i {
-            0 => {
-                if lang == Language::English {
-                    "Yesterday".into()
-                } else {
-                    "Вчера".into()
-                }
-            }
-            1 => {
+    let today_index = hourly_by_day
+        .iter()
+        .position(|g| g[0].date == data.local_today)
+        .unwrap_or(0);
+    let mut selected_hourly_day = use_signal(|| today_index as i32);
+
+    let day_labels: Vec<String> = hourly_by_day
+        .iter()
+        .map(|group| {
+            let date = &group[0].date;
+            if date == &data.local_today {
                 if lang == Language::English {
                     "Today".into()
                 } else {
                     "Сегодня".into()
                 }
-            }
-            2 => {
+            } else if date == &data.local_yesterday {
                 if lang == Language::English {
-                    "Tomorrow".into()
+                    "Yesterday".into()
                 } else {
-                    "Завтра".into()
+                    "Вчера".into()
                 }
-            }
-            3 => {
-                if lang == Language::English {
-                    "In 2 days".into()
+            } else if let Some(offset) = day_offset(&data.local_today, date) {
+                if offset == 1 {
+                    if lang == Language::English {
+                        "Tomorrow".into()
+                    } else {
+                        "Завтра".into()
+                    }
                 } else {
-                    "Послезавтра".into()
+                    format_day_label(date, &lang)
                 }
+            } else {
+                format_day_label(date, &lang)
             }
-            4 => {
-                if lang == Language::English {
-                    "In 3 days".into()
-                } else {
-                    "Через 3 дня".into()
-                }
-            }
-            5 => {
-                if lang == Language::English {
-                    "In 4 days".into()
-                } else {
-                    "Через 4 дня".into()
-                }
-            }
-            _ => format!("+{}d", i + 1),
         })
         .collect();
 
@@ -526,14 +529,32 @@ pub fn WeatherDisplay(
             let y_max: f64 = to_y(day.temperature_max);
             let y_min: f64 = to_y(day.temperature_min);
             let icon: &str = condition_icon_from_text(&day.condition);
-            let label: String = if i == 0 {
-                if lang == Language::English {
-                    "Yesterday".into()
+            let label: String = {
+                if i == 0 {
+                    if lang == Language::English {
+                        "Yesterday".into()
+                    } else {
+                        "Вчера".into()
+                    }
+                } else if day.date == data.local_today {
+                    if lang == Language::English {
+                        "Today".into()
+                    } else {
+                        "Сегодня".into()
+                    }
+                } else if let Some(offset) = day_offset(&data.local_today, &day.date) {
+                    if offset == 1 {
+                        if lang == Language::English {
+                            "Tomorrow".into()
+                        } else {
+                            "Завтра".into()
+                        }
+                    } else {
+                        format_day_label(&day.date, &lang)
+                    }
                 } else {
-                    "Вчера".into()
+                    format_day_label(&day.date, &lang)
                 }
-            } else {
-                format_forecast_label(&day.date, i - 1, &lang)
             };
             // Convert temperature for display
             let max_temp_str: String = format!(
@@ -1086,9 +1107,9 @@ pub fn WeatherDisplay(
                             }
                             button {
                                 class: "icon-btn",
-                                disabled: selected_hourly_day() == 5,
+                                disabled: selected_hourly_day() >= hourly_max_index,
                                 onclick: move |_| {
-                                    if selected_hourly_day() < 5 {
+                                    if selected_hourly_day() < hourly_max_index {
                                         selected_hourly_day += 1;
                                     }
                                 },
