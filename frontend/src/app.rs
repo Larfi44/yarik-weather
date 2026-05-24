@@ -8,15 +8,15 @@ use crate::components::search_bar::SearchBar;
 use crate::components::settings_modal::SettingsModal;
 use crate::components::weather_display::WeatherDisplay;
 use crate::components::welcome_modal::WelcomeModal;
-use crate::settings::cycle_theme;
-use crate::settings::get_settings;
-use crate::settings::save_settings;
-use crate::settings::theme_icon;
 use crate::settings::Language;
 use crate::settings::TempUnit;
 use crate::settings::Theme;
 use crate::settings::UserSettings;
 use crate::settings::WindUnit;
+use crate::settings::cycle_theme;
+use crate::settings::get_settings;
+use crate::settings::save_settings;
+use crate::settings::theme_icon;
 use crate::types::WeatherResponse;
 
 use dioxus::prelude::*;
@@ -29,7 +29,7 @@ fn favicon_data_url() -> String {
 }
 
 fn base64_encode(s: &str) -> String {
-    use base64::{engine::general_purpose, Engine as _};
+    use base64::{Engine as _, engine::general_purpose};
     general_purpose::STANDARD.encode(s)
 }
 
@@ -165,13 +165,13 @@ pub fn App() -> Element {
                             "AI"
                         }
                         {
-                            #[cfg(target_arch = "wasm32")]
+                            #[cfg(target_arch = "wasm32")] #[cfg(not(feature = "tauri"))]
                             {
                                 rsx! {
                                     button { class: "icon-btn", onclick: move |_| show_downloads.set(true), "📥" }
                                 }
                             }
-                            #[cfg(not(target_arch = "wasm32"))]
+                            #[cfg(not(target_arch = "wasm32"))] #[cfg(not(feature = "tauri"))]
                             {
                                 rsx! {
                                     Fragment {}

@@ -48,7 +48,7 @@ pub struct UserSettings {
     pub default_city: String,
     pub theme: Theme,
     pub first_time: bool,
-    pub pressure_unit: PressureUnit, // new field
+    pub pressure_unit: PressureUnit,
 }
 
 impl Default for UserSettings {
@@ -73,6 +73,7 @@ pub fn apple_icon(theme: Theme) -> Asset {
     }
 }
 
+// ── Web ──
 #[cfg(target_arch = "wasm32")]
 use gloo_storage::{LocalStorage, Storage};
 
@@ -86,48 +87,32 @@ pub fn save_settings(settings: &UserSettings) {
     let _ = LocalStorage::set(SETTINGS_KEY, settings);
 }
 
+// ── Desktop ──
 #[cfg(all(not(target_arch = "wasm32"), not(target_os = "android")))]
 pub fn get_settings() -> UserSettings {
-    let settings_path = if let Some(home_dir) = ::dirs::config_dir() {
-        home_dir.join("yarik-weather/settings.json")
-    } else {
-        std::path::PathBuf::from("settings.json")
-    };
-
-    if settings_path.exists() {
-        if let Ok(content) = std::fs::read_to_string(&settings_path) {
-            if let Ok(settings) = serde_json::from_str(&content) {
-                return settings;
+    let p = ::dirs::config_dir()
+        .unwrap_or_default()
+        .join("yarik-weather/settings.json");
+    if p.exists() {
+        if let Ok(c) = std::fs::read_to_string(&p) {
+            if let Ok(s) = serde_json::from_str(&c) {
+                return s;
             }
         }
     }
-
     UserSettings::default()
 }
 
 #[cfg(all(not(target_arch = "wasm32"), not(target_os = "android")))]
 pub fn save_settings(settings: &UserSettings) {
-    let settings_path = if let Some(home_dir) = ::dirs::config_dir() {
-        let config_dir = home_dir.join("yarik-weather");
-        let _ = std::fs::create_dir_all(&config_dir);
-        config_dir.join("settings.json")
-    } else {
-        std::path::PathBuf::from("settings.json")
-    };
-
-    if let Ok(json) = serde_json::to_string_pretty(settings) {
-        let _ = std::fs::write(&settings_path, json);
+    let d = ::dirs::config_dir()
+        .unwrap_or_default()
+        .join("yarik-weather");
+    let _ = std::fs::create_dir_all(&d);
+    let p = d.join("settings.json");
+    if let Ok(j) = serde_json::to_string_pretty(settings) {
+        let _ = std::fs::write(&p, j);
     }
-}
-
-#[cfg(target_os = "android")]
-pub fn get_settings() -> UserSettings {
-    UserSettings::default()
-}
-
-#[cfg(target_os = "android")]
-pub fn save_settings(settings: &UserSettings) {
-    tracing::info!("Attempting to save settings on Android: {:?}", settings);
 }
 
 pub fn cycle_theme(theme: Theme) -> Theme {

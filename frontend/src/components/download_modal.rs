@@ -3,9 +3,9 @@ mod inner {
     use crate::assets::ANDROID_ICON;
     use crate::assets::LINUX_ICON;
     use crate::assets::WINDOWS_ICON;
-    use crate::settings::apple_icon;
     use crate::settings::Language;
     use crate::settings::Theme;
+    use crate::settings::apple_icon;
     use dioxus::prelude::*;
     use wasm_bindgen::JsCast;
 
@@ -45,15 +45,15 @@ mod inner {
 
     pub fn download_url(os: DownloadOs) -> &'static str {
         match os {
-            DownloadOs::Android => "/downloads/YarikWeather-Android.apk",
-            DownloadOs::Windows => "/downloads/YarikWeather-Windows.exe",
-            DownloadOs::MacOS => "/downloads/YarikWeather-MacOS.dmg",
+            DownloadOs::Android => "/downloads/YarikWeather.apk",
+            DownloadOs::Windows => "/downloads/YarikWeather.exe",
+            DownloadOs::MacOS => "/downloads/YarikWeather.dmg",
             DownloadOs::Linux => "",
         }
     }
 
     pub fn download_file(url: &str, filename: &str) {
-        use web_sys::{window, HtmlAnchorElement};
+        use web_sys::{HtmlAnchorElement, window};
 
         if let Some(window) = window() {
             if let Some(document) = window.document() {

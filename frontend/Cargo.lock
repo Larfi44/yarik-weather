@@ -42,6 +42,23 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "683d7910e743518b0e34f1186f92494becacb047c7b6bf616c96772180fef923"
 
 [[package]]
+name = "android_log-sys"
+version = "0.3.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "84521a3cf562bc62942e294181d9eef17eb38ceb8c68677bc49f144e4c3d4f8d"
+
+[[package]]
+name = "android_logger"
+version = "0.14.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "05b07e8e73d720a1f2e4b6014766e6039fd2e96a4fa44e2a78d0e1fa2ff49826"
+dependencies = [
+ "android_log-sys",
+ "env_filter",
+ "log",
+]
+
+[[package]]
 name = "android_system_properties"
 version = "0.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1959,6 +1976,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "env_filter"
+version = "0.1.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1bf3c259d255ca70051b30e2e95b5446cdb8949ac4cd22c0d7fd634d89f568e2"
+dependencies = [
+ "log",
+ "regex",
+]
+
+[[package]]
 name = "equator"
 version = "0.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2133,34 +2160,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cb4cb245038516f5f85277875cdaa4f7d2c9a0fa0468de06ed190163b1581fcf"
 dependencies = [
  "percent-encoding",
-]
-
-[[package]]
-name = "frontend"
-version = "0.1.0"
-dependencies = [
- "base64",
- "chrono",
- "console_error_panic_hook",
- "console_log",
- "dioxus",
- "dioxus-desktop",
- "dioxus-web 0.5.6",
- "dirs 5.0.1",
- "gloo",
- "gloo-net 0.7.0",
- "gloo-storage",
- "gloo-utils 0.3.0",
- "log",
- "pollster 0.3.0",
- "reqwest 0.13.3",
- "serde",
- "serde_json",
- "tracing",
- "tracing-subscriber",
- "urlencoding",
- "wasm-bindgen",
- "web-sys",
 ]
 
 [[package]]
@@ -5009,6 +5008,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "regex"
+version = "1.12.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e10754a14b9137dd7b1e3e5b0493cc9171fdd105e0ab477f51b72e7f3ac0e276"
+dependencies = [
+ "aho-corasick",
+ "memchr",
+ "regex-automata",
+ "regex-syntax",
+]
+
+[[package]]
 name = "regex-automata"
 version = "0.4.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5077,9 +5088,7 @@ checksum = "62e0021ea2c22aed41653bc7e1419abb2c97e038ff2c33d0e1309e49a97deec0"
 dependencies = [
  "base64",
  "bytes",
- "encoding_rs",
  "futures-core",
- "h2",
  "http",
  "http-body",
  "http-body-util",
@@ -5088,13 +5097,14 @@ dependencies = [
  "hyper-util",
  "js-sys",
  "log",
- "mime",
  "percent-encoding",
  "pin-project-lite",
  "quinn",
  "rustls",
  "rustls-pki-types",
  "rustls-platform-verifier",
+ "serde",
+ "serde_json",
  "sync_wrapper",
  "tokio",
  "tokio-rustls",
@@ -7553,6 +7563,35 @@ name = "y4m"
 version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7a5a4b21e1a62b67a2970e6831bc091d7b87e119e7f9791aef9702e3bef04448"
+
+[[package]]
+name = "yarik-weather"
+version = "1.0.0"
+dependencies = [
+ "android_logger",
+ "base64",
+ "chrono",
+ "console_error_panic_hook",
+ "console_log",
+ "dioxus",
+ "dioxus-desktop",
+ "dioxus-web 0.5.6",
+ "dirs 5.0.1",
+ "gloo",
+ "gloo-net 0.7.0",
+ "gloo-storage",
+ "gloo-utils 0.3.0",
+ "log",
+ "pollster 0.3.0",
+ "reqwest 0.13.3",
+ "serde",
+ "serde_json",
+ "tracing",
+ "tracing-subscriber",
+ "urlencoding",
+ "wasm-bindgen",
+ "web-sys",
+]
 
 [[package]]
 name = "yoke"

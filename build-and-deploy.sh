@@ -1,6 +1,7 @@
 #!/bin/bash
 cd "$(dirname "$0")"
 set -e
+set -o pipefail
 
 echo "========================================="
 echo "  Yarik Weather - Build & Deploy"
@@ -9,8 +10,17 @@ echo "========================================="
 # ---- Weather backend ----
 cd backend
 echo "Deploying weather backend..."
-docker build --platform linux/amd64 -t cr.yandex/crp5q6mqrcrcaiah7fgf/yarik-weather:latest .
-docker push cr.yandex/crp5q6mqrcrcaiah7fgf/yarik-weather:latest
+
+echo "  → Vendoring Rust dependencies (offline build)…"
+cargo vendor   # creates vendor/ and .cargo/config.toml
+
+docker buildx build --platform linux/amd64 \
+  -t cr.yandex/crp5q6mqrcrcaiah7fgf/yarik-weather:latest \
+  --push \
+  .
+
+# Clean up vendored files after build (optional – saves space)
+rm -rf vendor .cargo/config.toml
 
 yc serverless container revision deploy \
   --container-name yarik-weather \
@@ -21,11 +31,23 @@ yc serverless container revision deploy \
   --service-account-id ajetvd45epqtuua9l6ob
 
 echo "Weather backend done"
+cd ..
 
 # ---- AI backend ----
+cd backend/ai
 echo "Deploying AI backend..."
-docker build --platform linux/amd64 -t cr.yandex/crp5q6mqrcrcaiah7fgf/yaroslav-ai-weather:latest .
-docker push cr.yandex/crp5q6mqrcrcaiah7fgf/yaroslav-ai-weather:latest
+
+echo "  → Downloading Python wheels (offline build)…"
+mkdir -p wheels
+venv/bin/pip download --dest wheels fastapi uvicorn pandas numpy requests scikit-learn lightgbm
+
+docker buildx build --platform linux/amd64 \
+  -t cr.yandex/crp5q6mqrcrcaiah7fgf/yaroslav-ai-weather:latest \
+  --push \
+  .
+
+# Optional: clean up wheels
+rm -rf wheels
 
 yc serverless container revision deploy \
   --container-name yaroslav-ai-weather \
@@ -35,19 +57,18 @@ yc serverless container revision deploy \
   --execution-timeout 60s \
   --service-account-id ajetvd45epqtuua9l6ob
 
+cd ../..
 echo "AI backend done"
 
-# ---- MacOS ----
-cd ..
+# ---- macOS ----
 cd frontend
-echo "Building MacOS..."
+echo "Building macOS..."
 cargo build --release --features desktop 2>&1 | tail -1
 
-echo "Packaging MacOS..."
+echo "Packaging macOS..."
 rm -rf YarikWeather.app YarikWeather-MacOS.dmg
-mkdir -p YarikWeather.app/Contents/MacOS
-mkdir -p YarikWeather.app/Contents/Resources
-cp target/release/frontend YarikWeather.app/Contents/MacOS/YarikWeather
+mkdir -p YarikWeather.app/Contents/MacOS YarikWeather.app/Contents/Resources
+cp target/release/yarik-weather YarikWeather.app/Contents/MacOS/YarikWeather
 chmod +x YarikWeather.app/Contents/MacOS/YarikWeather
 cp assets/favicon.svg YarikWeather.app/Contents/MacOS/
 cp assets/icon.icns YarikWeather.app/Contents/Resources/
@@ -69,10 +90,8 @@ cat > YarikWeather.app/Contents/Info.plist << 'ENDPLIST'
 ENDPLIST
 
 xattr -cr YarikWeather.app 2>/dev/null || true
-
-# Create .dmg without Finder customization (reliable, no AppleScript)
 hdiutil create -volname "YarikWeather" -srcfolder YarikWeather.app -ov -format UDZO YarikWeather-MacOS.dmg
-echo "MacOS .dmg done"
+echo "macOS .dmg done"
 
 # ---- Windows ----
 echo "Building Windows..."
@@ -80,142 +99,156 @@ export PATH="/opt/homebrew/opt/llvm/bin:$PATH"
 cargo xwin build --release --target x86_64-pc-windows-msvc --features desktop 2>&1 | tail -1
 
 echo "Packaging Windows..."
-cp target/x86_64-pc-windows-msvc/release/frontend.exe YarikWeather-Windows.exe
+cp target/x86_64-pc-windows-msvc/release/yarik-weather.exe YarikWeather-Windows.exe
 echo "Windows .exe done"
+cd ..   # back to project root
+
+# ---- Prepare downloads folder ----
+mkdir -p frontend/assets/downloads
 
 # ---- Android ----
-# echo "Building Android (Rust)..."
-# dx build --android 2>&1 | tail -3 || true
+echo "Building Android..."
+cd frontend
 
-# echo "Patching Android Gradle files..."
-# # Change AGP version
-# find target/dx -name "build.gradle.kts" -exec sed -i '' 's/8\.7\.0/8.5.0/g' {} \;
-# # Change Gradle wrapper version
-# find target/dx -name "gradle-wrapper.properties" -exec sed -i '' 's/gradle-9\.1\.0-bin/gradle-8.7-bin/g' {} \;
+echo "  Building WASM for Android..."
+cargo build --release --target wasm32-unknown-unknown --features tauri 2>&1 | tail -1
 
-# # Use local Gradle zip (offline)
-# ANDROID_APP_DIR="target/dx/frontend/debug/android/app"
-# cat > "$ANDROID_APP_DIR/gradle/wrapper/gradle-wrapper.properties" << 'WRAPPER'
-# distributionBase=GRADLE_USER_HOME
-# distributionPath=wrapper/dists
-# distributionUrl=file\:/Users/Yaroslav/Downloads/gradle-8.7-bin.zip
-# zipStoreBase=GRADLE_USER_HOME
-# zipStorePath=wrapper/dists
-# WRAPPER
+if ! command -v wasm-bindgen &> /dev/null; then
+    cargo install wasm-bindgen-cli --version 0.2.120
+fi
 
-# # Fix manifest, styles and activity to avoid AppCompat dependency
-# cat > "$ANDROID_APP_DIR/app/src/main/AndroidManifest.xml" << 'XML'
-# <?xml version="1.0" encoding="utf-8"?>
-# <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-#     <application
-#         android:label="Yarik Weather"
-#         android:hardwareAccelerated="true">
-#         <activity
-#             android:name=".MainActivity"
-#             android:exported="true"
-#             android:configChanges="orientation|screenSize|screenLayout|keyboardHidden">
-#             <intent-filter>
-#                 <action android:name="android.intent.action.MAIN" />
-#                 <category android:name="android.intent.category.LAUNCHER" />
-#             </intent-filter>
-#         </activity>
-#     </application>
-# </manifest>
-# XML
+mkdir -p dist-android/wasm dist-android/assets
+wasm-bindgen \
+    --out-dir dist-android/wasm \
+    --target web \
+    target/wasm32-unknown-unknown/release/yarik-weather.wasm
 
-# cat > "$ANDROID_APP_DIR/app/src/main/res/values/styles.xml" << 'XML'
-# <?xml version="1.0" encoding="utf-8"?>
-# <resources>
-#     <style name="AppTheme" parent="@android:style/Theme.DeviceDefault.NoActionBar" />
-# </resources>
-# XML
+cp -r assets/* dist-android/assets/
+cat > dist-android/index.html << 'EOF'
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Yarik Weather</title>
+  <link rel="icon" type="image/svg+xml" href="./assets/favicon.svg" />
+  <link rel="stylesheet" href="./assets/main.css" />
+</head>
+<body>
+  <div id="main"></div>
+  <script type="module">
+    import init from './wasm/yarik-weather.js';
+    init('./wasm/yarik-weather_bg.wasm');
+  </script>
+</body>
+</html>
+EOF
 
-# cat > "$ANDROID_APP_DIR/app/src/main/kotlin/dev/dioxus/main/WryActivity.kt" << 'KT'
-# package dev.dioxus.main
+echo "  Android web assets prepared in dist-android/"
 
-# import android.app.Activity
-# import android.os.Bundle
+echo "  Generating Android icon..."
+mkdir -p ../src-tauri/icons
+qlmanage -t -s 1024 -o /tmp assets/favicon.svg
+mv /tmp/favicon.svg.png /tmp/icon.png
+sips -z 32 32 /tmp/icon.png --out ../src-tauri/icons/32x32.png
+sips -z 128 128 /tmp/icon.png --out ../src-tauri/icons/128x128.png
+sips -z 256 256 /tmp/icon.png --out ../src-tauri/icons/128x128@2x.png
+sips -z 256 256 /tmp/icon.png --out ../src-tauri/icons/icon.icns
+sips -z 256 256 /tmp/icon.png --out ../src-tauri/icons/icon.ico
+sips -z 512 512 /tmp/icon.png --out ../src-tauri/icons/512x512.png
 
-# abstract class WryActivity : Activity() {
-#     override fun onCreate(savedInstanceState: Bundle?) {
-#         super.onCreate(savedInstanceState)
-#     }
-# }
-# KT
+cd ..
+export TAURI_ANDROID_AGP_VERSION=8.2.0
+export TAURI_ANDROID_TARGETS="arm64-v8a"
+echo "  Building APK..."
+rm -rf src-tauri/gen/android
+cargo tauri android init
+cargo tauri android build 2>&1 | tee /tmp/android-build.log
 
-# # Use installed SDK 35 / build-tools 35.0.1
-# cat > "$ANDROID_APP_DIR/app/build.gradle.kts" << 'GRADLE'
-# plugins {
-#     id("com.android.application")
-# }
+APK_PATH=$(find src-tauri/gen/android -name "*.apk" -type f | head -1)
+if [ -z "$APK_PATH" ]; then
+    echo "Error: No APK found after build"
+    exit 1
+fi
+echo "  Signing APK: $APK_PATH"
 
-# android {
-#     namespace = "com.yourcompany.frontend"
-#     compileSdk = 35
-#     buildToolsVersion = "35.0.1"
+if [ ! -f ~/.android/debug.keystore ]; then
+    keytool -genkey -v \
+      -keystore ~/.android/debug.keystore \
+      -storepass android \
+      -alias androiddebugkey \
+      -keypass android \
+      -keyalg RSA -keysize 2048 -validity 10000 \
+      -dname "CN=Android Debug,O=Android,C=US"
+fi
 
-#     defaultConfig {
-#         applicationId = "com.yourcompany.frontend"
-#         minSdk = 24
-#         targetSdk = 35
-#         versionCode = 1
-#         versionName = "1.0"
-#     }
+~/Library/Android/sdk/build-tools/35.0.0/apksigner sign \
+  --ks ~/.android/debug.keystore \
+  --ks-pass pass:android \
+  --ks-key-alias androiddebugkey \
+  --key-pass pass:android \
+  --out YarikWeather-Android.apk \
+  "$APK_PATH"
 
-#     sourceSets {
-#         getByName("main") {
-#             assets.srcDirs("src/main/assets")
-#             jniLibs.srcDirs("src/main/jniLibs")
-#         }
-#     }
-# }
-# GRADLE
+echo "Android .apk done"
 
-# # Point to local Android SDK
-# cat > "$ANDROID_APP_DIR/local.properties" << 'LOCAL'
-# sdk.dir=/Users/Yaroslav/Library/Android/sdk
-# LOCAL
+cp YarikWeather-Android.apk frontend/assets/downloads/
 
-# echo "android.suppressUnsupportedCompileSdk=35" >> "$ANDROID_APP_DIR/gradle.properties"
-# echo "android.builder.sdkDownload=false" >> "$ANDROID_APP_DIR/gradle.properties"
+# ---- Web (rebuild without tauri feature) ----
+echo "Building web assets..."
+cd frontend
+cargo build --release --target wasm32-unknown-unknown
+mkdir -p dist-web/wasm dist-web/assets
+wasm-bindgen --out-dir dist-web/wasm --target web target/wasm32-unknown-unknown/release/yarik-weather.wasm
+cp -r assets/* dist-web/assets/
+cat > dist-web/index.html << 'EOF'
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Yarik Weather</title>
+  <link rel="icon" type="image/svg+xml" href="./assets/favicon.svg" />
+  <link rel="stylesheet" href="./assets/main.css" />
+</head>
+<body>
+  <div id="main"></div>
+  <script type="module">
+    import init from './wasm/yarik-weather.js';
+    init('./wasm/yarik-weather_bg.wasm');
+  </script>
+</body>
+</html>
+EOF
 
-# echo "Building APK..."
-# cd "$ANDROID_APP_DIR"
-# chmod +x gradlew
+echo "Preparing web upload..."
+mkdir -p web-upload
+cp -r dist-web/* web-upload/
+mkdir -p web-upload/downloads
+cp assets/downloads/* web-upload/downloads/
 
-# # Run Gradle
-# JAVA_HOME=/opt/homebrew/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home ./gradlew assembleDebug 2>&1 | tail -5
-# cd "$OLDPWD"
-
-# # Find and copy APK
-# find target -name "*.apk" -exec cp {} assets/downloads/YarikWeather-Android.apk \;
-# echo "Android APK done"
-
-# # ---- Copy to downloads ----
-# mkdir -p assets/downloads
-# cp YarikWeather-MacOS.dmg assets/downloads/
-# cp YarikWeather-Windows.exe assets/downloads/
-# echo "Android .apk done"
-
-# ---- Web ----
-echo "Building web..."
-dx build --release --platform web 2>&1 | tail -1
-
-echo "Preparing upload..."
-mkdir -p target/dx/frontend/release/web/public/downloads
-cp assets/downloads/YarikWeather-MacOS.dmg target/dx/frontend/release/web/public/downloads/
-cp assets/downloads/YarikWeather-Windows.exe target/dx/frontend/release/web/public/downloads/
-cp assets/downloads/YarikWeather-Android.apk target/dx/frontend/release/web/public/downloads/ 2>/dev/null || true
-
-# ---- Upload ----
 echo "Uploading to Yandex..."
-cd target/dx/frontend/release/web/public
+cd web-upload
 aws s3 sync . s3://yarik-weather-app/ --endpoint-url=https://storage.yandexcloud.net --no-progress
-cd "$OLDPWD"
-echo "Web done"
+cd ..
+rm -rf web-upload dist-web
+cd ..
 
-# ---- Clean up ----
-rm -rf YarikWeather.app YarikWeather-MacOS.dmg YarikWeather-Windows.exe
+# ---- Clean up temporary files ----
+rm -rf frontend/YarikWeather.app
+rm -f  frontend/YarikWeather-MacOS.dmg
+rm -f  frontend/YarikWeather-Windows.exe
+rm -f  YarikWeather-Android.apk YarikWeather-Android.apk.idsig
+
+# ---- Remove old Docker images ----
+echo "Removing old images..."
+for repo in yarik-weather yaroslav-ai-weather; do
+  yc container image list --repository-name "crp5q6mqrcrcaiah7fgf/$repo" --format json \
+    | jq -r '.[] | select(.tags[0] != "latest") | .id' \
+    | while read id; do
+        test -n "$id" && yc container image delete "$id"
+    done
+done
 
 echo ""
 echo "========================================="
