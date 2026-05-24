@@ -34,3 +34,6 @@ application_id = "com.yourcompany.frontend"
 # Version information
 version_code = 1
 version_name = "1.0"
+
+[build]
+optimize = false

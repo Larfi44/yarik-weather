@@ -520,17 +520,48 @@ async fn fetch_forecast(client: &Client, lat: f64, lon: f64) -> anyhow::Result<O
 }
 
 async fn fetch_yesterday(client: &Client, lat: f64, lon: f64) -> anyhow::Result<DailyData> {
-    let yesterday = chrono::Utc::now().date_naive() - chrono::TimeDelta::days(1);
+    let yesterday = chrono::Utc::now().date_naive() - chrono::Duration::days(1);
     let date_str = yesterday.format("%Y-%m-%d").to_string();
     let url = format!(
         "https://archive-api.open-meteo.com/v1/archive?latitude={:.4}&longitude={:.4}&start_date={}&end_date={}&\
         daily=temperature_2m_max,temperature_2m_min,wind_speed_10m_max,weather_code&timezone=auto",
         lat, lon, date_str, date_str
     );
-    let archive: OpenMeteoArchive = fetch_json(client, &url).await?;
+
+    // Custom client with longer timeout + retry on any 5xx
+    let archive_client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(30))
+        .build()?;
+
+    let mut attempt = 0;
+    let archive = loop {
+        attempt += 1;
+        match archive_client.get(&url).send().await {
+            Ok(resp) if resp.status().is_success() => {
+                break resp.json::<OpenMeteoArchive>().await?;
+            }
+            Ok(resp) if resp.status().is_server_error() && attempt < 2 => {
+                // retry once on any 5xx (includes 504)
+                tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+                continue;
+            }
+            Ok(resp) => {
+                return Err(anyhow::anyhow!("Archive API error: {}", resp.status()));
+            }
+            Err(e) => {
+                if attempt < 2 {
+                    tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+                    continue;
+                }
+                return Err(e.into());
+            }
+        }
+    };
+
     if archive.daily.time.is_empty() {
         return Err(anyhow::anyhow!("no historical data"));
     }
+
     let (moon_name, moon_illum) = moon_phase_for_date(yesterday);
     Ok(DailyData {
         date: archive.daily.time[0].clone(),

@@ -1,12 +1,12 @@
 use crate::helpers::open_link;
-use crate::settings::choice_btn_class;
-use crate::settings::save_settings;
 use crate::settings::Language;
 use crate::settings::PressureUnit;
 use crate::settings::TempUnit;
 use crate::settings::Theme;
 use crate::settings::UserSettings;
 use crate::settings::WindUnit;
+use crate::settings::choice_btn_class;
+use crate::settings::save_settings;
 
 use dioxus::prelude::*;
 
@@ -298,10 +298,26 @@ pub fn SettingsModal(
                         }
                     }
                     a {
-                        href: "#",
+                        href: "https://larfi44.github.io/Yarik-Studio.github.io/index.html",
+                        target: "_blank",
                         style: "color: #4a9eff; text-decoration: none; font-weight: 600; cursor: pointer;",
-                        onclick: |_| open_link("https://larfi44.github.io/Yarik-Studio.github.io/index.html"),
                         "Yarik Studio"
+                    }
+                }
+
+                div { style: "margin-top: 16px; display: flex; justify-content: center;",
+                    a {
+                        href: "https://pay.cloudtips.ru/p/b94e349b",
+                        target: "_blank",
+                        button {
+                            class: "primary-btn",
+                            style: "font-size: 0.9rem; padding: 10px 20px;",
+                            if lang == Language::English {
+                                "❤️ Donate"
+                            } else {
+                                "❤️ Пожертвовать"
+                            }
+                        }
                     }
                 }
             }
