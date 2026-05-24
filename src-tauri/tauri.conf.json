@@ -4,8 +4,7 @@
   "version": "0.1.0",
   "identifier": "com.yarikstudio.yarikweather",
   "build": {
-    "frontendDist": "../frontend/dist",
-    "beforeBuildCommand": "echo 'Built manually'"
+    "frontendDist": "../frontend/dist-android"
   },
   "app": {
     "windows": [
@@ -28,12 +27,22 @@
       "icons/32x32.png",
       "icons/128x128.png",
       "icons/128x128@2x.png",
+      "icons/48x48.png",
+      "icons/72x72.png",
+      "icons/96x96.png",
+      "icons/144x144.png",
+      "icons/192x192.png",
+      "icons/512x512.png",
       "icons/icon.icns",
-      "icons/icon.ico",
-      "icons/512x512.png"
+      "icons/icon.ico"
     ],
     "android": {
       "debugApplicationIdSuffix": ".debug"
+    }
+  },
+  "plugins": {
+    "shell": {
+      "open": true
     }
   }
 }

@@ -298,25 +298,22 @@ pub fn SettingsModal(
                         }
                     }
                     a {
-                        href: "https://larfi44.github.io/Yarik-Studio.github.io/index.html",
-                        target: "_blank",
+                        href: "#",
                         style: "color: #4a9eff; text-decoration: none; font-weight: 600; cursor: pointer;",
+                        onclick: move |_| open_link("https://larfi44.github.io/Yarik-Studio.github.io/index.html"),
                         "Yarik Studio"
                     }
                 }
 
                 div { style: "margin-top: 16px; display: flex; justify-content: center;",
-                    a {
-                        href: "https://pay.cloudtips.ru/p/b94e349b",
-                        target: "_blank",
-                        button {
-                            class: "primary-btn",
-                            style: "font-size: 0.9rem; padding: 10px 20px;",
-                            if lang == Language::English {
-                                "❤️ Donate"
-                            } else {
-                                "❤️ Пожертвовать"
-                            }
+                    button {
+                        class: "primary-btn",
+                        style: "font-size: 0.9rem; padding: 10px 20px;",
+                        onclick: move |_| open_link("https://pay.cloudtips.ru/p/b94e349b"),
+                        if lang == Language::English {
+                            "❤️ Donate"
+                        } else {
+                            "❤️ Пожертвовать"
                         }
                     }
                 }

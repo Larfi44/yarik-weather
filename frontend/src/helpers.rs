@@ -212,16 +212,25 @@ pub fn month_name_ru(month: u32) -> &'static str {
 }
 
 pub fn open_link(url: &str) {
-    #[cfg(target_arch = "wasm32")]
-    {
-        use gloo_utils::window;
-        let _ = window().open_with_url_and_target(url, "_blank");
-    }
-    #[cfg(not(target_arch = "wasm32"))]
-    {
-        // For desktop, we'll need to use a different approach
-        // This is a placeholder - you might want to use a crate like "open" for desktop
-        let _ = std::process::Command::new("open").arg(url).spawn();
+    if let Some(window) = web_sys::window() {
+        // Open in a new tab / window (works on web; Tauri will later be handled by the plugin)
+        let _ = window.open_with_url_and_target(url, "_blank");
+    } else {
+        // Fallback for native builds without a webview (e.g., pure desktop)
+        #[cfg(target_os = "macos")]
+        {
+            let _ = std::process::Command::new("open").arg(url).spawn();
+        }
+        #[cfg(target_os = "linux")]
+        {
+            let _ = std::process::Command::new("xdg-open").arg(url).spawn();
+        }
+        #[cfg(target_os = "windows")]
+        {
+            let _ = std::process::Command::new("cmd")
+                .args(&["/C", "start", url])
+                .spawn();
+        }
     }
 }
 
