@@ -4,8 +4,6 @@ version = "1.0.0"
 authors = ["Larfi44 <yaroslav.krasulya@gmail.com>"]
 edition = "2024"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [dependencies]
 dioxus = { version = "0.7.4" }
 dioxus-web = { version = "0.5.0", optional = true }
@@ -28,7 +26,7 @@ gloo = "0.12.0"
 gloo-net = "0.7.0"
 gloo-storage = "0.4.0"
 web-sys = { version = "0.3.97", features = ["Window", "MediaQueryList", "MediaQueryListEvent", "HtmlAnchorElement"] }
-wasm-bindgen = "0.2" 
+wasm-bindgen = "0.2"
 console_error_panic_hook = "0.1"
 console_log = "1.0"
 log = "0.4"
@@ -39,9 +37,7 @@ base64 = "0.22"
 default = ["web"]
 web = ["dioxus-web", "dioxus/web"]
 desktop = ["dioxus-desktop", "dioxus/desktop", "pollster", "dirs"]
-mobile = ["dioxus/mobile", "tracing", "tracing-subscriber"]
-server = ["dioxus/server"]
-tauri = []
+mobile = []
 
 [target.'cfg(target_os = "android")'.dependencies]
 log = "0.4"

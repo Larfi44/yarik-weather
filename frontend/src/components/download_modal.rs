@@ -1,11 +1,11 @@
 #[cfg(target_arch = "wasm32")]
 mod inner {
-    use crate::assets::ANDROID_ICON;
-    use crate::assets::LINUX_ICON;
-    use crate::assets::WINDOWS_ICON;
+    use crate::assets::ANDROID_ICON_PATH;
+    use crate::assets::LINUX_ICON_PATH;
+    use crate::assets::WINDOWS_ICON_PATH;
     use crate::settings::Language;
     use crate::settings::Theme;
-    use crate::settings::apple_icon;
+    use crate::settings::apple_icon; // now returns &'static str
     use dioxus::prelude::*;
     use wasm_bindgen::JsCast;
 
@@ -45,9 +45,9 @@ mod inner {
 
     pub fn download_url(os: DownloadOs) -> &'static str {
         match os {
-            DownloadOs::Android => "/downloads/YarikWeather.apk",
-            DownloadOs::Windows => "/downloads/YarikWeather.exe",
-            DownloadOs::MacOS => "/downloads/YarikWeather.dmg",
+            DownloadOs::Android => "/downloads/YarikWeather-Android.apk",
+            DownloadOs::Windows => "/downloads/YarikWeather-Windows.exe",
+            DownloadOs::MacOS => "/downloads/YarikWeather-MacOS.dmg",
             DownloadOs::Linux => "",
         }
     }
@@ -98,16 +98,16 @@ mod inner {
                     {
                         let active = selected() == os;
                         let icon = match os {
-                            DownloadOs::Android => ANDROID_ICON,
-                            DownloadOs::Windows => WINDOWS_ICON,
-                            DownloadOs::MacOS => apple_icon(theme),
-                            DownloadOs::Linux => LINUX_ICON,
+                            DownloadOs::Android => ANDROID_ICON_PATH,
+                            DownloadOs::Windows => WINDOWS_ICON_PATH,
+                            DownloadOs::MacOS => apple_icon(theme), // returns &str
+                            DownloadOs::Linux => LINUX_ICON_PATH,
                         };
                         rsx! {
                             div {
                                 class: if active { "download-card active" } else { "download-card" },
                                 onclick: move |_| selected.set(os),
-                                img { class: "download-card-icon", src: icon }
+                                img { class: "download-card-icon", src: "{icon}" }
                                 div { class: "download-card-title", "{download_label(os, &lang)}" }
                                 div { class: "download-card-desc", "{download_description(os, &lang)}" }
                             }

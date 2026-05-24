@@ -5,10 +5,18 @@ use dioxus::prelude::*;
 use gloo_net::http::Request;
 use serde_json::Value;
 
-const YAROSLAV_AI: Asset = asset!("/assets/yaroslav_ai.svg");
+// ---------- Embedded AI icon ----------
+const YAROSLAV_AI_SVG: &str = include_str!("../../assets/yaroslav_ai.svg");
+
+fn yaroslav_ai_data_url() -> String {
+    use base64::{Engine as _, engine::general_purpose};
+    let encoded = general_purpose::STANDARD.encode(YAROSLAV_AI_SVG);
+    format!("data:image/svg+xml;base64,{}", encoded)
+}
+// ------------------------------------
 
 // Helper to format a temperature with the correct unit and conversion
-fn format_temp(celsius: f64, unit: &TempUnit, lang: &Language) -> String {
+fn format_temp(celsius: f64, unit: &TempUnit, _lang: &Language) -> String {
     let converted = convert_temp(celsius, unit);
     let unit_str = match unit {
         TempUnit::Celsius => "°C",
@@ -290,7 +298,7 @@ pub fn AiModal(
                 div { class: "modal-topbar",
                     div { class: "ai-modal-title",
                         img {
-                            src: YAROSLAV_AI,
+                            src: "{yaroslav_ai_data_url()}",
                             class: "ai-logo-icon",
                             alt: "Yaroslav AI",
                         }

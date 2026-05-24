@@ -164,14 +164,15 @@ pub fn App() -> Element {
                             onclick: move |_| show_ai_modal.set(true),
                             "AI"
                         }
+                        // Download button: only on web, not on mobile
                         {
-                            #[cfg(target_arch = "wasm32")] #[cfg(not(feature = "tauri"))]
+                            #[cfg(all(target_arch = "wasm32", not(feature = "mobile")))]
                             {
                                 rsx! {
                                     button { class: "icon-btn", onclick: move |_| show_downloads.set(true), "📥" }
                                 }
                             }
-                            #[cfg(not(target_arch = "wasm32"))] #[cfg(not(feature = "tauri"))]
+                            #[cfg(any(not(target_arch = "wasm32"), feature = "mobile"))]
                             {
                                 rsx! {
                                     Fragment {}
@@ -260,9 +261,9 @@ pub fn App() -> Element {
                         }
                     }
                 }
-                // Download modal – only on web
+                // Download modal: only on web, not on mobile
                 {
-                    #[cfg(target_arch = "wasm32")]
+                    #[cfg(all(target_arch = "wasm32", not(feature = "mobile")))]
                     {
                         rsx! {
                             if show_downloads() {
@@ -274,7 +275,7 @@ pub fn App() -> Element {
                             }
                         }
                     }
-                    #[cfg(not(target_arch = "wasm32"))]
+                    #[cfg(any(not(target_arch = "wasm32"), feature = "mobile"))]
                     {
                         rsx! {
                             Fragment {}

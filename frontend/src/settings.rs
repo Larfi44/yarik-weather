@@ -1,6 +1,3 @@
-use crate::assets::APPLE_DARK;
-use crate::assets::APPLE_LIGHT;
-
 use dioxus::prelude::*;
 use serde::{Deserialize, Serialize};
 
@@ -65,11 +62,11 @@ impl Default for UserSettings {
     }
 }
 
-pub fn apple_icon(theme: Theme) -> Asset {
+pub fn apple_icon(theme: Theme) -> &'static str {
     match theme {
-        Theme::Light => APPLE_DARK,
-        Theme::Dark => APPLE_LIGHT,
-        Theme::Auto => APPLE_LIGHT,
+        Theme::Light => crate::assets::APPLE_DARK_PATH,
+        Theme::Dark => crate::assets::APPLE_LIGHT_PATH,
+        Theme::Auto => crate::assets::APPLE_LIGHT_PATH,
     }
 }
 

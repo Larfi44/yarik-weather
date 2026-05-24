@@ -7,65 +7,16 @@ echo "========================================="
 echo "  Yarik Weather - Build & Deploy"
 echo "========================================="
 
-# ---- Weather backend ----
-cd backend
-echo "Deploying weather backend..."
-
-echo "  → Vendoring Rust dependencies (offline build)…"
-cargo vendor   # creates vendor/ and .cargo/config.toml
-
-docker buildx build --platform linux/amd64 \
-  -t cr.yandex/crp5q6mqrcrcaiah7fgf/yarik-weather:latest \
-  --push \
-  .
-
-# Clean up vendored files after build (optional – saves space)
-rm -rf vendor .cargo/config.toml
-
-yc serverless container revision deploy \
-  --container-name yarik-weather \
-  --image cr.yandex/crp5q6mqrcrcaiah7fgf/yarik-weather:latest \
-  --cores 1 \
-  --memory 512MB \
-  --execution-timeout 60s \
-  --service-account-id ajetvd45epqtuua9l6ob
-
-echo "Weather backend done"
 cd ..
 
-# ---- AI backend ----
-cd backend/ai
-echo "Deploying AI backend..."
-
-echo "  → Downloading Python wheels (offline build)…"
-mkdir -p wheels
-venv/bin/pip download --dest wheels fastapi uvicorn pandas numpy requests scikit-learn lightgbm
-
-docker buildx build --platform linux/amd64 \
-  -t cr.yandex/crp5q6mqrcrcaiah7fgf/yaroslav-ai-weather:latest \
-  --push \
-  .
-
-# Optional: clean up wheels
-rm -rf wheels
-
-yc serverless container revision deploy \
-  --container-name yaroslav-ai-weather \
-  --image cr.yandex/crp5q6mqrcrcaiah7fgf/yaroslav-ai-weather:latest \
-  --cores 1 \
-  --memory 256MB \
-  --execution-timeout 60s \
-  --service-account-id ajetvd45epqtuua9l6ob
-
-cd ../..
-echo "AI backend done"
-
-# ---- macOS ----
+# ---- MacOS ----
 cd frontend
-echo "Building macOS..."
-cargo build --release --features desktop 2>&1 | tail -1
+mkdir -p assets/downloads
 
-echo "Packaging macOS..."
+echo "Building MacOS..."
+cargo build --release --features desktop -j 4 2>&1 | tail -60
+
+echo "Packaging MacOS..."
 rm -rf YarikWeather.app YarikWeather-MacOS.dmg
 mkdir -p YarikWeather.app/Contents/MacOS YarikWeather.app/Contents/Resources
 cp target/release/yarik-weather YarikWeather.app/Contents/MacOS/YarikWeather
@@ -91,7 +42,8 @@ ENDPLIST
 
 xattr -cr YarikWeather.app 2>/dev/null || true
 hdiutil create -volname "YarikWeather" -srcfolder YarikWeather.app -ov -format UDZO YarikWeather-MacOS.dmg
-echo "macOS .dmg done"
+cp YarikWeather-MacOS.dmg assets/downloads/
+echo "MacOS .dmg done"
 
 # ---- Windows ----
 echo "Building Windows..."
@@ -100,8 +52,9 @@ cargo xwin build --release --target x86_64-pc-windows-msvc --features desktop 2>
 
 echo "Packaging Windows..."
 cp target/x86_64-pc-windows-msvc/release/yarik-weather.exe YarikWeather-Windows.exe
+cp YarikWeather-Windows.exe assets/downloads/
 echo "Windows .exe done"
-cd ..   # back to project root
+cd ..
 
 # ---- Prepare downloads folder ----
 mkdir -p frontend/assets/downloads
@@ -111,7 +64,7 @@ echo "Building Android..."
 cd frontend
 
 echo "  Building WASM for Android..."
-cargo build --release --target wasm32-unknown-unknown --features tauri 2>&1 | tail -1
+cargo build --release --target wasm32-unknown-unknown --features mobile 2>&1 | tail -1
 
 if ! command -v wasm-bindgen &> /dev/null; then
     cargo install wasm-bindgen-cli --version 0.2.120
@@ -240,18 +193,8 @@ rm -f  frontend/YarikWeather-MacOS.dmg
 rm -f  frontend/YarikWeather-Windows.exe
 rm -f  YarikWeather-Android.apk YarikWeather-Android.apk.idsig
 
-# ---- Remove old Docker images ----
-echo "Removing old images..."
-for repo in yarik-weather yaroslav-ai-weather; do
-  yc container image list --repository-name "crp5q6mqrcrcaiah7fgf/$repo" --format json \
-    | jq -r '.[] | select(.tags[0] != "latest") | .id' \
-    | while read id; do
-        test -n "$id" && yc container image delete "$id"
-    done
-done
-
 echo ""
 echo "========================================="
-echo "  ✅ Done!"
+echo "  ✅ Frontend done!"
 echo "  https://yarik-weather-app.website.yandexcloud.net"
 echo "========================================="

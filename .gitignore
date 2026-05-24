@@ -11,11 +11,13 @@ Thumbs.db
 # Backend (Rust)
 backend/target/
 backend/*.rs.bk
-backend/Cargo.lock   # Optional: commit for apps, ignore for libs
+backend/Cargo.lock
+backend/model_*.onnx
 
 # Frontend (Dioxus)
 frontend/target/
 frontend/*.rs.bk
+frontend/assets/downloads/
 
 # Build artifacts
 *.exe
