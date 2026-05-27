@@ -112,11 +112,11 @@ sips -z 512 512 /tmp/icon.png --out ../src-tauri/icons/512x512.png
 
 cd ..
 export TAURI_ANDROID_AGP_VERSION=8.2.0
-export TAURI_ANDROID_TARGETS="arm64-v8a"
+export TAURI_ANDROID_TARGETS="aarch64"
 echo "  Building APK..."
 rm -rf src-tauri/gen/android
 cargo tauri android init
-cargo tauri android build 2>&1 | tee /tmp/android-build.log
+cargo tauri android build --target aarch64 2>&1 | tee /tmp/android-build.log
 
 APK_PATH=$(find src-tauri/gen/android -name "*.apk" -type f | head -1)
 if [ -z "$APK_PATH" ]; then
@@ -143,9 +143,9 @@ fi
   --out YarikWeather-Android.apk \
   "$APK_PATH"
 
-echo "Android .apk done"
-
 cp YarikWeather-Android.apk frontend/assets/downloads/
+
+echo "Android .apk done"
 
 # ---- Web (rebuild without tauri feature) ----
 echo "Building web assets..."

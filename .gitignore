@@ -19,6 +19,24 @@ frontend/target/
 frontend/*.rs.bk
 frontend/assets/downloads/
 
+# Tauri generated files
+src-tauri/gen/
+src-tauri/icons/ios/
+src-tauri/icons/64x64.png
+
+# Frontend build artifacts
+frontend/dist-android/
+frontend/YarikWeather-MacOS.dmg
+frontend/YarikWeather.app/
+frontend/assets/favicon_hired.png
+frontend/dist-android/assets/favicon_hired.png
+
+# Backend vendor directory
+backend/vendor/
+
+# Old Capacitor Android project
+android/
+
 # Build artifacts
 *.exe
 *.o
