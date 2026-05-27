@@ -8,6 +8,8 @@ use crate::components::search_bar::SearchBar;
 use crate::components::settings_modal::SettingsModal;
 use crate::components::weather_display::WeatherDisplay;
 use crate::components::welcome_modal::WelcomeModal;
+#[cfg(target_arch = "wasm32")]
+use crate::helpers::update_weather_widget;
 use crate::settings::Language;
 use crate::settings::TempUnit;
 use crate::settings::Theme;
@@ -52,7 +54,6 @@ pub fn App() -> Element {
         Theme::Light
     });
 
-    // Update system theme when media query changes (web only)
     use_effect(move || {
         #[cfg(target_arch = "wasm32")]
         {
@@ -96,9 +97,9 @@ pub fn App() -> Element {
     let lang: Language = settings().language.clone();
 
     let fetch_and_set = {
-        let weather = weather;
-        let loading = loading;
-        let error = error;
+        let weather = weather.clone();
+        let loading = loading.clone();
+        let error = error.clone();
         move |city: String, temp_unit: TempUnit, wind_unit: WindUnit| {
             let mut weather = weather;
             let mut loading = loading;
@@ -108,6 +109,29 @@ pub fn App() -> Element {
             spawn(async move {
                 match fetch_weather(&city, temp_unit, wind_unit).await {
                     Ok(data) => {
+                        let fc = data.forecast.first();
+                        let forecast_high = fc
+                            .map(|d| d.temperature_max)
+                            .unwrap_or(data.current.temperature);
+                        let forecast_low = fc
+                            .map(|d| d.temperature_min)
+                            .unwrap_or(data.current.temperature);
+                        let forecast_cond = fc
+                            .map(|d| d.condition.as_str())
+                            .unwrap_or(&data.current.condition);
+
+                        #[cfg(target_arch = "wasm32")]
+                        update_weather_widget(
+                            &data.city,
+                            data.current.temperature,
+                            &data.current.condition,
+                            data.current.pressure,
+                            forecast_high,
+                            forecast_low,
+                            forecast_cond,
+                        )
+                        .await;
+
                         weather.set(Some(data));
                         error.set(None);
                     }
@@ -164,7 +188,6 @@ pub fn App() -> Element {
                             onclick: move |_| show_ai_modal.set(true),
                             "AI"
                         }
-                        // Download button: only on web, not on mobile
                         {
                             #[cfg(all(target_arch = "wasm32", not(feature = "mobile")))]
                             {
@@ -261,7 +284,6 @@ pub fn App() -> Element {
                         }
                     }
                 }
-                // Download modal: only on web, not on mobile
                 {
                     #[cfg(all(target_arch = "wasm32", not(feature = "mobile")))]
                     {

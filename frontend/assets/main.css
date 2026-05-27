@@ -1035,3 +1035,8 @@ body {
     cursor: default;
     pointer-events: none;
 }
+
+* {
+    -webkit-tap-highlight-color: transparent;
+    outline: none;
+}

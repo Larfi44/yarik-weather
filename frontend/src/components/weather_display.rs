@@ -2,7 +2,6 @@ use crate::helpers::condition_icon_from_text;
 use crate::helpers::convert_pressure;
 use crate::helpers::convert_temp;
 use crate::helpers::convert_wind;
-use crate::helpers::format_forecast_label;
 use crate::helpers::format_time;
 use crate::helpers::is_coastal_city;
 use crate::helpers::moon_emoji_from_phase;
@@ -20,9 +19,9 @@ use crate::settings::WindUnit;
 use crate::types::DailyData;
 use crate::types::HourlyData;
 use crate::types::WeatherResponse;
+use chrono::{Local, Timelike};
 
 use chrono::Datelike;
-use chrono::Local;
 use dioxus::prelude::*;
 
 /// Calculate the difference in days between two dates (to - from).
@@ -125,7 +124,7 @@ pub fn WeatherDisplay(
     };
     let min_line_opacity: f64 = if theme == Theme::Light { 1.0 } else { 0.5 };
 
-    // ---- Hourly chart: Yesterday → Today → Tomorrow … ----
+    // ---- Hourly chart ----
     let mut hourly_by_day: Vec<Vec<&HourlyData>> = Vec::new();
     let mut current_date: Option<&str> = None;
     let mut current_group = Vec::new();
@@ -147,9 +146,9 @@ pub fn WeatherDisplay(
         hourly_by_day.push(current_group);
     }
 
-    let hourly_max_index = hourly_by_day.len().saturating_sub(1) as i32;
+    let hourly_max_index: i32 = hourly_by_day.len().saturating_sub(1) as i32;
 
-    let today_index = hourly_by_day
+    let today_index: usize = hourly_by_day
         .iter()
         .position(|g| g[0].date == data.local_today)
         .unwrap_or(0);
@@ -245,7 +244,6 @@ pub fn WeatherDisplay(
             let x = h_padding + h_step_x * i as f64;
             let y = h_to_y(h.temperature);
             let icon = condition_icon_from_text(&h.condition);
-            // Convert temperature for display
             let temp_str = format!(
                 "{:.0}{}",
                 convert_temp(h.temperature, &temp_unit),
@@ -340,6 +338,81 @@ pub fn WeatherDisplay(
         children
     };
 
+    // ---- "Now" line (only for today) ----
+    let now_line: Option<(f64, String)> = {
+        if let Some(today_hours) = hourly_by_day.get(today_index) {
+            if today_hours == &displayed_hours {
+                let now = Local::now();
+                let now_minutes = now.hour() * 60 + now.minute();
+
+                let mut left_idx = None;
+                let mut right_idx = None;
+                for (i, h) in displayed_hours.iter().enumerate() {
+                    let parts: Vec<&str> = h.time.split(':').collect();
+                    if parts.len() == 2 {
+                        let hh = parts[0].parse::<u32>().unwrap_or(0);
+                        let mm = parts[1].parse::<u32>().unwrap_or(0);
+                        let minutes = hh * 60 + mm;
+                        if minutes <= now_minutes {
+                            left_idx = Some(i);
+                        } else if right_idx.is_none() {
+                            right_idx = Some(i);
+                            break;
+                        }
+                    }
+                }
+
+                if left_idx.is_none() {
+                    left_idx = Some(0);
+                    right_idx = Some(0);
+                } else if right_idx.is_none() {
+                    right_idx = left_idx;
+                }
+
+                let li = left_idx.unwrap();
+                let ri = right_idx.unwrap();
+                let left_x = h_padding + h_step_x * li as f64;
+                let right_x = h_padding + h_step_x * ri as f64;
+
+                let left_parts: Vec<&str> = displayed_hours[li].time.split(':').collect();
+                let left_minutes = if left_parts.len() == 2 {
+                    left_parts[0].parse::<u32>().unwrap_or(0) * 60
+                        + left_parts[1].parse::<u32>().unwrap_or(0)
+                } else {
+                    0
+                };
+
+                let right_minutes = if li == ri {
+                    left_minutes + 60
+                } else {
+                    let right_parts: Vec<&str> = displayed_hours[ri].time.split(':').collect();
+                    if right_parts.len() == 2 {
+                        right_parts[0].parse::<u32>().unwrap_or(0) * 60
+                            + right_parts[1].parse::<u32>().unwrap_or(0)
+                    } else {
+                        left_minutes + 60
+                    }
+                };
+
+                let fraction = if right_minutes == left_minutes {
+                    0.0
+                } else {
+                    (now_minutes as f64 - left_minutes as f64)
+                        / (right_minutes as f64 - left_minutes as f64)
+                };
+
+                let now_x = left_x + fraction * (right_x - left_x);
+                let now_label = format!("{:02}:{:02}", now.hour(), now.minute());
+
+                Some((now_x, now_label))
+            } else {
+                None
+            }
+        } else {
+            None
+        }
+    };
+
     // Hourly tooltip
     let hourly_tooltip: Option<VNode> = h_hovered().and_then(|idx| {
         let displayed_hour = displayed_hours.get(idx)?;
@@ -360,7 +433,6 @@ pub fn WeatherDisplay(
             translate_category(wind_cat, &lang)
         );
 
-        // Precipitation probability
         let precip_str = format!(
             "{}: {}%",
             if lang == Language::English {
@@ -448,6 +520,29 @@ pub fn WeatherDisplay(
                 {child}
             }
             {hourly_tooltip}
+            // ---- "Now" line ----
+            if let Some((now_x, now_label)) = now_line {
+                line {
+                    x1: format!("{:.1}", now_x),
+                    y1: format!("{:.0}", h_padding - 10.0),
+                    x2: format!("{:.1}", now_x),
+                    y2: format!("{:.0}", h_view_height - h_padding + 10.0),
+                    stroke: "red",
+                    stroke_width: 1.5,
+                    stroke_dasharray: "4 3",
+                    opacity: 0.8,
+                }
+                text {
+                    x: format!("{:.1}", now_x),
+                    y: format!("{:.0}", h_padding - 22.0),
+                    text_anchor: "middle",
+                    font_size: "10",
+                    fill: "red",
+                    stroke: "none",
+                    font_weight: "bold",
+                    "{now_label}"
+                }
+            }
         }
     }
     .unwrap();

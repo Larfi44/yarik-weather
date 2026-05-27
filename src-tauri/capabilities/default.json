@@ -6,6 +6,9 @@
     "main"
   ],
   "permissions": [
-    "core:default"
+    "core:default",
+    "widgets:default",
+    "widgets:allow-set-widget-config",
+    "opener:allow-open-url"
   ]
 }
