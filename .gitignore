@@ -13,28 +13,23 @@ backend/target/
 backend/*.rs.bk
 backend/Cargo.lock
 backend/model_*.onnx
+backend/vendor/
 
-# Frontend (Dioxus)
-frontend/target/
-frontend/*.rs.bk
-frontend/assets/downloads/
+# Frontend (Next.js)
+frontend/.next/
+frontend/out/
+frontend/build/
+frontend/dist/
+frontend/public/downloads/
+frontend/download/
+frontend/public/favicon_hired.png
 
 # Tauri generated files
 src-tauri/gen/
 src-tauri/icons/ios/
 src-tauri/icons/64x64.png
 
-# Frontend build artifacts
-frontend/dist-android/
-frontend/YarikWeather-MacOS.dmg
-frontend/YarikWeather.app/
-frontend/assets/favicon_hired.png
-frontend/dist-android/assets/favicon_hired.png
-
-# Backend vendor directory
-backend/vendor/
-
-# Old Capacitor Android project
+# Old projects
 android/
 
 # Build artifacts
@@ -42,3 +37,5 @@ android/
 *.o
 *.so
 *.dylib
+*.dmg
+*.app
