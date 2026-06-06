@@ -1,0 +1,799 @@
+@import "tailwindcss";
+
+:root {
+  --accent: #006aff;
+  --accent2: #5a9e4b;
+  --muted: #888;
+  --text: #1a1a1a;
+  --yw-bg: #f0f4f8;
+  --yw-card: rgba(255, 255, 255, 0.75);
+  --yw-border: rgba(0, 0, 0, 0.08);
+  --yw-ai-blue: #4a9eff;
+}
+
+.theme-dark {
+  --accent: #e8913a;
+  --accent2: #6dbf6d;
+  --muted: #9ca3af;
+  --text: #e5e7eb;
+  --yw-bg: #1a1a2e;
+  --yw-card: #252540;
+  --yw-border: rgba(255, 255, 255, 0.12);
+  --yw-ai-blue: #64b5f6;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: var(--yw-bg);
+  color: var(--text);
+  min-height: 100vh;
+  transition: background 0.3s, color 0.3s;
+}
+
+/* ── App Shell ── */
+.app-shell {
+  min-height: 100vh;
+  display: flex;
+  justify-content: center;
+  padding: 16px;
+}
+
+.app-container {
+  max-width: 950px;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* ── Glass Card ── */
+.glass-card {
+  background: var(--yw-card);
+  border: 1px solid var(--yw-border);
+  border-radius: 16px;
+  padding: 20px;
+  transition: background 0.3s, border-color 0.3s;
+}
+
+.theme-light .glass-card {
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+/* ── Header ── */
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 20px;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.header-icon {
+  width: 32px;
+  height: 32px;
+}
+
+.brand h1 {
+  font-size: 1.3rem;
+  font-weight: 700;
+}
+
+.header-buttons {
+  display: flex;
+  gap: 8px;
+}
+
+.icon-btn {
+  background: none;
+  border: 1px solid var(--yw-border);
+  border-radius: 10px;
+  padding: 6px 12px;
+  font-size: 1.1rem;
+  cursor: pointer;
+  transition: background 0.2s, transform 0.1s;
+  color: var(--text);
+}
+
+.icon-btn:hover {
+  background: var(--yw-border);
+  transform: scale(1.05);
+}
+
+.theme-dark .icon-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+/* ── Search ── */
+.search-container {
+  display: flex;
+  gap: 8px;
+}
+
+.city-input {
+  flex: 1;
+  padding: 12px 16px;
+  border-radius: 12px;
+  border: 1px solid var(--yw-border);
+  background: var(--yw-card);
+  color: var(--text);
+  font-size: 1rem;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.city-input:focus {
+  border-color: var(--accent);
+}
+
+.search-btn {
+  padding: 12px 24px;
+  border-radius: 12px;
+  border: none;
+  background: var(--accent);
+  color: white;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+
+.search-btn:hover {
+  opacity: 0.85;
+}
+
+/* ── Status Cards ── */
+.status-card {
+  text-align: center;
+  padding: 32px;
+  font-size: 1rem;
+  color: var(--muted);
+}
+
+.error-card {
+  border-color: #e53e3e;
+}
+
+.error-title {
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: #e53e3e;
+  margin-bottom: 8px;
+}
+
+.error-message {
+  color: #fc8181;
+}
+
+/* ── Weather Display ── */
+.weather-container {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.current-weather {
+  text-align: center;
+}
+
+.city-line h2 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+
+.temp-large {
+  font-size: 3.5rem;
+  font-weight: 800;
+  line-height: 1.1;
+}
+
+.condition-line {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin: 8px 0;
+}
+
+.condition-icon {
+  font-size: 2rem;
+}
+
+.condition-text {
+  font-size: 1.2rem;
+  color: var(--muted);
+}
+
+.weather-details {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 12px 24px;
+  margin-top: 12px;
+  font-size: 0.95rem;
+}
+
+.weather-details p {
+  margin: 0;
+}
+
+/* ── Chart Section ── */
+.chart-section {
+  overflow: visible;
+}
+
+.chart-section h3 {
+  margin-bottom: 12px;
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.chart-scroll {
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.chart-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+/* ── Hourly Tabs ── */
+.hourly-tabs {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+
+.hourly-tab {
+  padding: 6px 14px;
+  border-radius: 8px;
+  border: 1px solid var(--yw-border);
+  background: transparent;
+  color: var(--text);
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s;
+}
+
+.hourly-tab.active {
+  background: var(--accent);
+  color: white;
+  border-color: var(--accent);
+}
+
+.hourly-tab:hover:not(.active) {
+  background: var(--yw-border);
+}
+
+.theme-dark .hourly-tab:hover:not(.active) {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+/* ── Chart Labels ── */
+.chart-point-group .chart-label-icon,
+.chart-point-group .chart-label-temp {
+  transition: opacity 0.2s;
+}
+
+.chart-point-group:hover .chart-label-icon,
+.chart-point-group:hover .chart-label-temp {
+  opacity: 0.4;
+}
+
+.chart-point {
+  cursor: pointer;
+  transition: r 0.15s;
+}
+
+/* ── Chart Tooltip (fixed position) ── */
+.chart-tooltip-fixed {
+  position: fixed;
+  width: 180px;
+  background: var(--yw-card);
+  border: 1px solid var(--yw-border);
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 0.82rem;
+  color: var(--text);
+  pointer-events: none;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+  line-height: 1.6;
+  z-index: 2000;
+}
+
+.theme-dark .chart-tooltip-fixed {
+  background: #2a2a4a;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+/* ── Chart Tooltip (legacy, inside SVG) ── */
+.chart-tooltip {
+  background: var(--yw-card);
+  border: 1px solid var(--yw-border);
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 0.82rem;
+  color: var(--text);
+  pointer-events: none;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+  line-height: 1.6;
+}
+
+.theme-dark .chart-tooltip {
+  background: #2a2a4a;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+/* ── Astronomy Section ── */
+.astronomy-section h3 {
+  margin-bottom: 12px;
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.astronomy-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.astro-card {
+  text-align: center;
+  padding: 12px;
+  border-radius: 12px;
+  background: var(--yw-card);
+  border: 1px solid var(--yw-border);
+}
+
+.theme-dark .astro-card {
+  background: #2a2a4a;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.sun-path-card {
+  padding: 0;
+  overflow: hidden;
+  border: none;
+  background: transparent;
+}
+
+.theme-dark .sun-path-card {
+  background: transparent;
+  border: none;
+}
+
+/* ── Modal ── */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.4);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+  padding: 16px;
+}
+
+.theme-dark .modal-overlay {
+  background: rgba(0, 0, 0, 0.6);
+}
+
+.modal {
+  background: var(--yw-bg);
+  border: 1px solid var(--yw-border);
+  border-radius: 20px;
+  padding: 24px;
+  max-width: 634px;
+  width: 100%;
+  max-height: 85vh;
+  overflow-y: auto;
+  position: relative;
+}
+
+.modal-topbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.modal-topbar h2 {
+  font-size: 1.3rem;
+  font-weight: 700;
+}
+
+.close-btn {
+  background: none;
+  border: none;
+  font-size: 1.3rem;
+  cursor: pointer;
+  color: var(--text);
+  padding: 4px 8px;
+  border-radius: 8px;
+  transition: background 0.2s;
+}
+
+.close-btn:hover {
+  background: var(--yw-border);
+}
+
+.theme-dark .close-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.modal-subtitle {
+  color: var(--muted);
+  margin-bottom: 16px;
+  font-size: 0.95rem;
+}
+
+/* ── Settings ── */
+.setting-row {
+  margin-bottom: 16px;
+  text-align: center;
+}
+
+.setting-row label {
+  display: block;
+  font-size: 0.9rem;
+  font-weight: 600;
+  margin-bottom: 6px;
+  color: var(--muted);
+}
+
+.choice-group {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.choice-btn {
+  padding: 6px 14px;
+  border-radius: 8px;
+  border: 1px solid var(--yw-border);
+  background: transparent;
+  color: var(--text);
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s, border-color 0.2s;
+}
+
+.choice-btn.active {
+  background: var(--accent);
+  color: white;
+  border-color: var(--accent);
+}
+
+.choice-btn:hover:not(.active) {
+  background: var(--yw-border);
+}
+
+.theme-dark .choice-btn:hover:not(.active) {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.text-input {
+  width: 100%;
+  max-width: 400px;
+  margin: 0 auto;
+  display: block;
+  padding: 10px 14px;
+  border-radius: 10px;
+  border: 1px solid var(--yw-border);
+  background: var(--yw-card);
+  color: var(--text);
+  font-size: 0.95rem;
+  outline: none;
+  text-align: center;
+}
+
+.text-input:focus {
+  border-color: var(--accent);
+}
+
+.primary-btn {
+  padding: 10px 24px;
+  border-radius: 12px;
+  border: none;
+  background: var(--accent);
+  color: white;
+  font-weight: 600;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: opacity 0.2s, transform 0.1s;
+}
+
+.primary-btn:hover {
+  opacity: 0.85;
+  transform: scale(1.02);
+}
+
+.primary-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* ── AI Modal ── */
+.ai-results-modal {
+  max-width: 634px;
+}
+
+.ai-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--yw-border);
+}
+
+.ai-modal-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 1.3rem;
+  font-weight: 700;
+}
+
+.ai-logo-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+}
+
+.ai-loading {
+  text-align: center;
+  padding: 24px;
+  font-size: 1.1rem;
+  color: var(--yw-ai-blue);
+  animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+.ai-tips {
+  margin-top: 12px;
+}
+
+.ai-tip {
+  padding: 8px 12px;
+  margin: 6px 0;
+  border-radius: 8px;
+  background: var(--yw-card);
+  border-left: 3px solid var(--yw-ai-blue);
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.theme-dark .ai-tip {
+  background: #2a2a4a;
+}
+
+.ai-predictions h3 {
+  margin-bottom: 12px;
+}
+
+.ai-pred-card {
+  background: var(--yw-card);
+  border: 1px solid var(--yw-border);
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 12px;
+}
+
+.theme-dark .ai-pred-card {
+  background: #2a2a4a;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.ai-pred-card h4 {
+  font-size: 1rem;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+.ai-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.ai-table td {
+  padding: 4px 8px;
+  font-size: 0.9rem;
+}
+
+.ai-table td:first-child {
+  color: var(--muted);
+}
+
+/* ── Download Modal ── */
+.download-modal {
+  max-width: 634px;
+}
+
+.download-scroll {
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.download-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.download-card {
+  border: 2px solid var(--yw-border);
+  border-radius: 14px;
+  padding: 16px;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color 0.2s, background 0.2s;
+}
+
+.download-card.active {
+  border-color: var(--accent);
+  background: var(--yw-card);
+}
+
+.download-card:hover:not(.active) {
+  background: var(--yw-card);
+}
+
+.download-card-icon {
+  width: 48px;
+  height: 48px;
+  margin: 0 auto 8px;
+  display: block;
+}
+
+/* Make Linux icon narrower while maintaining height */
+.download-card-icon[src="/linux.png"] {
+  width: 36px !important;
+  height: 48px !important;
+}
+
+.download-card-title {
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.download-card-desc {
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.download-actions {
+  margin-top: 16px;
+  text-align: center;
+}
+
+.download-confirm-btn {
+  width: 100%;
+}
+
+.linux-instructions {
+  margin-top: 16px;
+  padding: 12px;
+  border-radius: 10px;
+  background: var(--yw-card);
+}
+
+.theme-dark .linux-instructions {
+  background: #2a2a4a;
+}
+
+.linux-step {
+  margin-bottom: 12px;
+}
+
+.linux-step-text {
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.linux-instructions code {
+  display: block;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: var(--yw-bg);
+  font-family: monospace;
+  font-size: 0.85rem;
+  word-break: break-all;
+  color: var(--text);
+}
+
+.theme-dark .linux-instructions code {
+  background: #1a1a2e;
+}
+
+.mac-instructions {
+  margin-top: 16px;
+  text-align: left;
+  padding: 12px;
+  border-radius: 10px;
+  background: var(--yw-card);
+}
+
+.theme-dark .mac-instructions {
+  background: #2a2a4a;
+}
+
+.mac-instructions-title {
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+.mac-instructions-step {
+  font-size: 0.9rem;
+  color: var(--muted);
+  margin-bottom: 4px;
+}
+
+/* ── Welcome Modal ── */
+.welcome-modal {
+  max-width: 634px;
+  text-align: center;
+}
+
+.welcome-modal .setting-row {
+  text-align: left;
+}
+
+/* ── Responsive ── */
+@media (min-width: 768px) {
+  .astronomy-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+/* ── Hide Next.js Dev Tools Button ── */
+[nextjs-dev-tools-button],
+[id*="nextjs-dev-tools"],
+button[aria-label="Next.js Dev Tools"] {
+  display: none !important;
+}
+
+@media (max-width: 640px) {
+  .app-container {
+    max-width: 100%;
+  }
+  .header {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .download-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+  .weather-details {
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+  }
+  .temp-large {
+    font-size: 2.8rem;
+  }
+}
