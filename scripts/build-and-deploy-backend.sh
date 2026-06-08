@@ -62,14 +62,14 @@ yc serverless container revision deploy \
 cd ../..
 echo "AI backend done"
 
-# ---- Remove old Docker images ----
+# ---- Remove old Docker images (non-fatal, with timeout) ----
 echo "Removing old images..."
 for repo in yarik-weather yaroslav-ai-weather; do
   yc container image list --repository-name "crp5q6mqrcrcaiah7fgf/$repo" --format json \
     | jq -r '.[] | select(.tags[0] != "latest") | .id' \
     | while read id; do
-        test -n "$id" && yc container image delete "$id"
+        test -n "$id" && (timeout 15 yc container image delete "$id" 2>/dev/null || true)
     done
-done
+done 2>/dev/null || true
 
 echo "Backend done"
