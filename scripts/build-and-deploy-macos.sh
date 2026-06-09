@@ -46,10 +46,6 @@ sed -i '' 's|"frontendDist": "../frontend/dist-android"|"frontendDist": "../fron
 echo "Building macOS app..."
 cargo tauri build --target aarch64-apple-darwin 2>&1 | tee /tmp/macos-build.log
 
-# Also build for x86_64 if needed (universal binary)
-echo "Building macOS app (x86_64)..."
-cargo tauri build --target x86_64-apple-darwin 2>&1 | tee -a /tmp/macos-build.log
-
 # ---- Restore tauri config ----
 sed -i '' 's|"frontendDist": "../frontend/dist-desktop"|"frontendDist": "../frontend/dist-android"|' src-tauri/tauri.conf.json
 
