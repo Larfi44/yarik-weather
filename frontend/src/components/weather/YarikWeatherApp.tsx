@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import Image from 'next/image';
 import {
   Language,
   Theme,
@@ -15,6 +14,7 @@ import {
 } from '@/lib/settings';
 import { WeatherResponse } from '@/lib/types';
 import { fetchWeather } from '@/lib/api';
+import { assetUrl } from '@/lib/assets';
 import SearchBar from '@/components/weather/SearchBar';
 import WeatherDisplay from '@/components/weather/WeatherDisplay';
 import AIModal from '@/components/weather/AiModal';
@@ -138,12 +138,10 @@ export default function YarikWeatherApp() {
       <div className="app-container">
         <div className="header glass-card">
           <div className="brand">
-            <Image
-              src="/favicon.svg"
+            <img
+              src={assetUrl('/favicon.svg')}
               className="header-icon"
               alt="Yarik Weather"
-              width={32}
-              height={32}
             />
             <h1>Yarik Weather</h1>
           </div>

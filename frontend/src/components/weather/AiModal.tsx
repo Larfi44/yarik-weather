@@ -1,8 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import Image from 'next/image';
 import { useTheme } from 'next-themes';
+import { assetUrl } from '@/lib/assets';
 import { fetchWeather } from '@/lib/api';
 import { getSettings } from '@/lib/settings';
 import type { WeatherResponse, AiPredictResponse } from '@/lib/types';
@@ -504,11 +504,9 @@ export default function AiModal({ open, onClose, weather }: AiModalProps) {
             className="ai-brand"
             style={{ display: 'flex', alignItems: 'center', gap: '10px' }}
           >
-            <Image
-              src="/yaroslav_ai.svg"
+            <img
+              src={assetUrl('/yaroslav_ai.svg')}
               alt="AI"
-              width={32}
-              height={32}
               style={{ width: '32px', height: '32px' }}
             />
             <span
