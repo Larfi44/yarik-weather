@@ -12,6 +12,7 @@ import {
   pressureUnitStr,
 } from '@/lib/settings';
 import { WeatherResponse, HourlyData, DailyData } from '@/lib/types';
+import { isCoastal } from '@/lib/coastal';
 import {
   convertTemp,
   convertWind,
@@ -388,7 +389,7 @@ export default function WeatherDisplay({
             {data.current.uv_index.toFixed(1)} (
             {translateCategory(uvCategory(data.current.uv_index), lang)})
           </p>
-          {data.current.sea_temperature != null && (
+          {data.current.sea_temperature != null && isCoastal(data.city) && (
             <p>
               🌊 {lang === Language.English ? 'Sea temp' : 'Темп. моря'}:{' '}
               {convertTemp(data.current.sea_temperature, temp_unit).toFixed(1)}

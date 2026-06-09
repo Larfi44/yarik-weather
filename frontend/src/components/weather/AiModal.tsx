@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useTheme } from 'next-themes';
 import { assetUrl } from '@/lib/assets';
+import { isCoastal } from '@/lib/coastal';
 import { fetchWeather } from '@/lib/api';
 import { getSettings } from '@/lib/settings';
 import type { WeatherResponse, AiPredictResponse } from '@/lib/types';
@@ -73,45 +74,6 @@ function swimScore(
   return Math.round(Math.max(0, Math.min(10, s)) * 10) / 10;
 }
 
-// ── Helpers to detect coastal from city name / lat-lon ──────────────
-
-const COASTAL_CITIES = new Set([
-  'sochi',
-  'odessa',
-  'y alta',
-  'sevastopol',
-  'miami',
-  'barcelona',
-  'nice',
-  'cannes',
-  'monaco',
-  'valencia',
-  'malaga',
-  'lisbon',
-  'porto',
-  'dubai',
-  'abu dhabi',
-  'shanghai',
-  'sydney',
-  'melbourne',
-  'rio de janeiro',
-  'bangkok',
-  'phuket',
-  'vladivostok',
-  'kaliningrad',
-  'st petersburg',
-]);
-
-function isCoastal(
-  city: string,
-  current: { latitude?: number; longitude?: number },
-): boolean {
-  if (COASTAL_CITIES.has(city.toLowerCase())) return true;
-  // Proximity to sea: if lat/lon available, roughly detect coastal
-  // Simplification: return true only for known coastal cities
-  return false;
-}
-
 export default function AiModal({ open, onClose, weather }: AiModalProps) {
   const language = getSettings().language;
   const { resolvedTheme } = useTheme();
@@ -146,7 +108,7 @@ export default function AiModal({ open, onClose, weather }: AiModalProps) {
         current.condition,
         current.precipitation_probability,
       );
-      const coastal = isCoastal(weather.city, current);
+      const coastal = isCoastal(weather.city);
 
       // ── Scores matching ai_service.py exactly ──
       const cScore = comfortScore(
