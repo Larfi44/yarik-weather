@@ -44,16 +44,15 @@ echo "Configuring Tauri for Windows desktop..."
 sed -i '' 's|"frontendDist": "../frontend/dist-android"|"frontendDist": "../frontend/dist-desktop"|' src-tauri/tauri.conf.json
 
 # ---- Build Windows app ----
-echo "Building Windows app (cross-compile via xwin)..."
+echo "Building Windows app (cross-compile via lld-link)..."
 export PATH="/opt/homebrew/opt/llvm/bin:$PATH"
 
-# Check if xwin is installed
-if ! command -v cargo-xwin &> /dev/null; then
-    echo "Installing cargo-xwin..."
-    cargo install cargo-xwin
-fi
+# Use LLVM's lld-link as the MSVC linker for cross-compilation
+export CARGO_TARGET_X86_64_PC_WINDOWS_MSVC_LINKER="lld-link"
+export CC_x86_64_pc_windows_msvc="clang-cl"
+export CXX_x86_64_pc_windows_msvc="clang-cl"
 
-cargo xwin tauri build --target x86_64-pc-windows-msvc 2>&1 | tee /tmp/windows-build.log
+cargo tauri build --target x86_64-pc-windows-msvc 2>&1 | tee /tmp/windows-build.log
 
 # ---- Restore tauri config ----
 sed -i '' 's|"frontendDist": "../frontend/dist-desktop"|"frontendDist": "../frontend/dist-android"|' src-tauri/tauri.conf.json

@@ -14,9 +14,9 @@ echo ""
 # echo ""
 
 # ---- Windows Desktop ----
-echo ">>> Building Windows..."
-./build-and-deploy-windows.sh
-echo ""
+# echo ">>> Building Windows..."
+# ./build-and-deploy-windows.sh
+# echo ""
 
 # ---- Android Mobile ----
 echo ">>> Building Android..."

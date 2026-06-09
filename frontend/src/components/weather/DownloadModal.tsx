@@ -12,6 +12,10 @@ interface DownloadModalProps {
   onClose: () => void;
 }
 
+/** Base URL for downloading from GitHub Releases */
+const RELEASE_BASE =
+  'https://github.com/Larfi44/yarik-weather/releases/latest/download';
+
 function downloadLabel(os: DownloadOs): string {
   const labels: Record<DownloadOs, string> = {
     android: 'Android',
@@ -43,21 +47,12 @@ function downloadDescription(os: DownloadOs, lang: Language): string {
 
 function downloadUrl(os: DownloadOs): string {
   const map: Record<DownloadOs, string> = {
-    android: '/downloads/YarikWeather-Android.apk',
-    windows: '/downloads/YarikWeather-Windows.exe',
-    macos: '/downloads/YarikWeather-MacOS.dmg',
+    android: `${RELEASE_BASE}/YarikWeather-Android.apk`,
+    windows: `${RELEASE_BASE}/YarikWeather-Windows.exe`,
+    macos: `${RELEASE_BASE}/YarikWeather-MacOS.dmg`,
     linux: '',
   };
   return map[os];
-}
-
-function downloadFile(url: string, filename: string) {
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
 }
 
 function getIcon(os: DownloadOs, theme: Theme): string {
@@ -151,16 +146,15 @@ export default function DownloadModal({
 
         <div className="download-actions">
           {selected !== 'linux' && (
-            <button
+            <a
               className="primary-btn download-confirm-btn"
-              onClick={() => {
-                const url = downloadUrl(selected);
-                const filename = url.split('/').pop() || 'download';
-                downloadFile(url, filename);
-              }}
+              href={downloadUrl(selected)}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{ textDecoration: 'none', display: 'inline-block' }}
             >
               {lang === Language.English ? 'Download' : 'Скачать'}
-            </button>
+            </a>
           )}
           {selected === 'macos' && (
             <div className="mac-instructions">
