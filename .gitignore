@@ -28,6 +28,20 @@ frontend/public/favicon_hired.png
 src-tauri/gen/
 src-tauri/icons/ios/
 src-tauri/icons/64x64.png
+src-tauri/icons/128x128.png
+src-tauri/icons/128x128@2x.png
+src-tauri/icons/32x32.png
+src-tauri/icons/48x48.png
+src-tauri/icons/72x72.png
+src-tauri/icons/96x96.png
+src-tauri/icons/144x144.png
+src-tauri/icons/192x192.png
+src-tauri/icons/512x512.png
+src-tauri/icons/Square*.png
+src-tauri/icons/StoreLogo.png
+src-tauri/icons/icon.ico
+src-tauri/icons/icon.icns
+src-tauri/icons/icon.png
 
 # Old projects
 android/
@@ -39,3 +53,32 @@ android/
 *.dylib
 *.dmg
 *.app
+
+# Node modules
+frontend/node_modules/
+
+# Build dist folders
+frontend/dist-android/
+frontend/dist-desktop/
+
+# Downloads / APK / DMG
+frontend/assets/downloads/
+frontend/public/downloads/
+
+# Mac app bundle
+frontend/YarikWeather.app/
+frontend/*.dmg
+
+# Large data files
+backend/models.pkl
+backend/ai/*.pkl
+
+# Logs
+frontend/dev.log
+
+# Android APK
+*.apk
+*.apk.idsig
+
+# Prisma generated
+frontend/node_modules/.prisma/
