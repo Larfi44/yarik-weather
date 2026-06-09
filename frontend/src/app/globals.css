@@ -1,4 +1,4 @@
-@import "tailwindcss";
+@import 'tailwindcss';
 
 :root {
   --accent: #006aff;
@@ -29,11 +29,14 @@
 }
 
 body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-family:
+    -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   background: var(--yw-bg);
   color: var(--text);
   min-height: 100vh;
-  transition: background 0.3s, color 0.3s;
+  transition:
+    background 0.3s,
+    color 0.3s;
 }
 
 /* ── App Shell ── */
@@ -58,7 +61,9 @@ body {
   border: 1px solid var(--yw-border);
   border-radius: 16px;
   padding: 20px;
-  transition: background 0.3s, border-color 0.3s;
+  transition:
+    background 0.3s,
+    border-color 0.3s;
 }
 
 .theme-light .glass-card {
@@ -102,7 +107,9 @@ body {
   padding: 6px 12px;
   font-size: 1.1rem;
   cursor: pointer;
-  transition: background 0.2s, transform 0.1s;
+  transition:
+    background 0.2s,
+    transform 0.1s;
   color: var(--text);
 }
 
@@ -267,7 +274,9 @@ body {
   color: var(--text);
   font-size: 0.85rem;
   cursor: pointer;
-  transition: background 0.2s, color 0.2s;
+  transition:
+    background 0.2s,
+    color 0.2s;
 }
 
 .hourly-tab.active {
@@ -311,7 +320,7 @@ body {
   font-size: 0.82rem;
   color: var(--text);
   pointer-events: none;
-  box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
   line-height: 1.6;
   z-index: 2000;
 }
@@ -330,7 +339,7 @@ body {
   font-size: 0.82rem;
   color: var(--text);
   pointer-events: none;
-  box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
   line-height: 1.6;
 }
 
@@ -348,7 +357,6 @@ body {
 
 .astronomy-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
   gap: 16px;
 }
 
@@ -420,7 +428,8 @@ body {
   font-weight: 700;
 }
 
-.close-btn {
+.close-btn,
+.modal-close {
   background: none;
   border: none;
   font-size: 1.3rem;
@@ -431,11 +440,13 @@ body {
   transition: background 0.2s;
 }
 
-.close-btn:hover {
+.close-btn:hover,
+.modal-close:hover {
   background: var(--yw-border);
 }
 
-.theme-dark .close-btn:hover {
+.theme-dark .close-btn:hover,
+.theme-dark .modal-close:hover {
   background: rgba(255, 255, 255, 0.1);
 }
 
@@ -474,7 +485,10 @@ body {
   color: var(--text);
   font-size: 0.85rem;
   cursor: pointer;
-  transition: background 0.2s, color 0.2s, border-color 0.2s;
+  transition:
+    background 0.2s,
+    color 0.2s,
+    border-color 0.2s;
 }
 
 .choice-btn.active {
@@ -519,7 +533,9 @@ body {
   font-weight: 600;
   font-size: 1rem;
   cursor: pointer;
-  transition: opacity 0.2s, transform 0.1s;
+  transition:
+    opacity 0.2s,
+    transform 0.1s;
 }
 
 .primary-btn:hover {
@@ -570,8 +586,13 @@ body {
 }
 
 @keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.5; }
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
 }
 
 .ai-tips {
@@ -651,7 +672,9 @@ body {
   padding: 16px;
   text-align: center;
   cursor: pointer;
-  transition: border-color 0.2s, background 0.2s;
+  transition:
+    border-color 0.2s,
+    background 0.2s;
 }
 
 .download-card.active {
@@ -671,7 +694,7 @@ body {
 }
 
 /* Make Linux icon narrower while maintaining height */
-.download-card-icon[src="/linux.png"] {
+.download-card-icon[src='/linux.png'] {
   width: 36px !important;
   height: 48px !important;
 }
@@ -772,8 +795,8 @@ body {
 
 /* ── Hide Next.js Dev Tools Button ── */
 [nextjs-dev-tools-button],
-[id*="nextjs-dev-tools"],
-button[aria-label="Next.js Dev Tools"] {
+[id*='nextjs-dev-tools'],
+button[aria-label='Next.js Dev Tools'] {
   display: none !important;
 }
 

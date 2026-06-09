@@ -1,15 +1,31 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { Language, Theme, UserSettings, TempUnit, WindUnit, getSettings, saveSettings, cycleTheme, themeIcon } from '@/lib/settings';
+import {
+  Language,
+  Theme,
+  UserSettings,
+  TempUnit,
+  WindUnit,
+  getSettings,
+  saveSettings,
+  cycleTheme,
+  themeIcon,
+} from '@/lib/settings';
 import { WeatherResponse } from '@/lib/types';
 import { fetchWeather } from '@/lib/api';
+import { assetUrl } from '@/lib/assets';
 import SearchBar from '@/components/weather/SearchBar';
 import WeatherDisplay from '@/components/weather/WeatherDisplay';
 import AIModal from '@/components/weather/AiModal';
 import DownloadModal from '@/components/weather/DownloadModal';
 import SettingsModal from '@/components/weather/SettingsModal';
 import WelcomeModal from '@/components/weather/WelcomeModal';
+
+/** Detect if the app is running inside Tauri (desktop/mobile) */
+function isTauri(): boolean {
+  return typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
+}
 
 export default function YarikWeatherApp() {
   const [settings, setSettings] = useState<UserSettings>(getSettings);
@@ -23,12 +39,15 @@ export default function YarikWeatherApp() {
   const [showDownloads, setShowDownloads] = useState(false);
   const [initialFetchDone, setInitialFetchDone] = useState(false);
 
+  const runningInTauri = isTauri();
+
   // Detect system theme
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const mq = window.matchMedia('(prefers-color-scheme: dark)');
     setSystemTheme(mq.matches ? Theme.Dark : Theme.Light);
-    const handler = (e: MediaQueryListEvent) => setSystemTheme(e.matches ? Theme.Dark : Theme.Light);
+    const handler = (e: MediaQueryListEvent) =>
+      setSystemTheme(e.matches ? Theme.Dark : Theme.Light);
     mq.addEventListener('change', handler);
     return () => mq.removeEventListener('change', handler);
   }, []);
@@ -41,8 +60,10 @@ export default function YarikWeatherApp() {
     }
   }, []);
 
-  const resolvedTheme: Theme = settings.theme === Theme.Auto ? systemTheme : settings.theme;
-  const themeClass = resolvedTheme === Theme.Dark ? 'theme-dark' : 'theme-light';
+  const resolvedTheme: Theme =
+    settings.theme === Theme.Auto ? systemTheme : settings.theme;
+  const themeClass =
+    resolvedTheme === Theme.Dark ? 'theme-dark' : 'theme-light';
   const lang = settings.language;
 
   // Sync theme class to <html> so CSS variables cascade to <body>
@@ -58,22 +79,28 @@ export default function YarikWeatherApp() {
     if (settings.first_time) setShowWelcome(true);
   }, []);
 
-  const fetchAndSet = useCallback((city: string, tempUnit: TempUnit, windUnit: WindUnit) => {
-    // Don't fetch if welcome modal is open
-    if (showWelcome) {
-      return;
-    }
-    setLoading(true);
-    setError(null);
-    fetchWeather(city, tempUnit, windUnit)
-      .then(data => { setWeather(data); setError(null); })
-      .catch(err => { setWeather(null); setError(err.message); })
-      .finally(() => setLoading(false));
-  }, [showWelcome]);
+  const fetchAndSet = useCallback(
+    (city: string, tempUnit: TempUnit, windUnit: WindUnit) => {
+      setLoading(true);
+      setError(null);
+      fetchWeather(city, tempUnit, windUnit)
+        .then((data) => {
+          setWeather(data);
+          setError(null);
+        })
+        .catch((err) => {
+          setWeather(null);
+          setError(err.message);
+        })
+        .finally(() => setLoading(false));
+    },
+    [],
+  );
 
   // Initial fetch
   useEffect(() => {
-    if (initialFetchDone || settings.first_time || !settings.default_city) return;
+    if (initialFetchDone || settings.first_time || !settings.default_city)
+      return;
     setInitialFetchDone(true);
     fetchAndSet(settings.default_city, settings.temp_unit, settings.wind_unit);
   }, [initialFetchDone, settings.first_time, settings.default_city]);
@@ -83,18 +110,26 @@ export default function YarikWeatherApp() {
     setSettings(s);
     saveSettings(s);
     setShowWelcome(false);
-    fetchAndSet(s.default_city, s.temp_unit, s.wind_unit);
+    // Auto-search after Get Started
+    if (s.default_city.trim()) {
+      fetchAndSet(s.default_city, s.temp_unit, s.wind_unit);
+    }
   };
 
   const handleSaveSettings = (newSettings: UserSettings) => {
     const old = settings;
     setSettings(newSettings);
     saveSettings(newSettings);
-    const needsRefetch = newSettings.default_city !== old.default_city
-      || newSettings.temp_unit !== old.temp_unit
-      || newSettings.wind_unit !== old.wind_unit;
+    const needsRefetch =
+      newSettings.default_city !== old.default_city ||
+      newSettings.temp_unit !== old.temp_unit ||
+      newSettings.wind_unit !== old.wind_unit;
     if (needsRefetch) {
-      fetchAndSet(newSettings.default_city, newSettings.temp_unit, newSettings.wind_unit);
+      fetchAndSet(
+        newSettings.default_city,
+        newSettings.temp_unit,
+        newSettings.wind_unit,
+      );
     }
   };
 
@@ -103,14 +138,21 @@ export default function YarikWeatherApp() {
       <div className="app-container">
         <div className="header glass-card">
           <div className="brand">
-            <img src="/favicon.svg" className="header-icon" alt="Yarik Weather" />
+            <img
+              src={assetUrl('/favicon.svg')}
+              className="header-icon"
+              alt="Yarik Weather"
+            />
             <h1>Yarik Weather</h1>
           </div>
           <div className="header-buttons">
             <button
               className="icon-btn"
               onClick={() => {
-                const newSettings = { ...settings, theme: cycleTheme(settings.theme) };
+                const newSettings = {
+                  ...settings,
+                  theme: cycleTheme(settings.theme),
+                };
                 setSettings(newSettings);
                 saveSettings(newSettings);
               }}
@@ -124,25 +166,41 @@ export default function YarikWeatherApp() {
             >
               AI
             </button>
-            <button className="icon-btn" onClick={() => setShowDownloads(true)}>📥</button>
-            <button className="icon-btn" onClick={() => setShowSettings(true)}>⚙️</button>
+            {/* Download button: temporarily hidden until GitHub Release is published */}
+            {false && !runningInTauri && (
+              <button
+                className="icon-btn"
+                onClick={() => setShowDownloads(true)}
+              >
+                📥
+              </button>
+            )}
+            <button className="icon-btn" onClick={() => setShowSettings(true)}>
+              ⚙️
+            </button>
           </div>
         </div>
 
         <SearchBar
           lang={lang}
-          onSearch={city => fetchAndSet(city, settings.temp_unit, settings.wind_unit)}
+          onSearch={(city) =>
+            fetchAndSet(city, settings.temp_unit, settings.wind_unit)
+          }
         />
 
         {loading && (
           <div className="status-card glass-card">
-            {lang === Language.English ? 'Loading weather data...' : 'Загрузка данных о погоде...'}
+            {lang === Language.English
+              ? 'Loading weather data...'
+              : 'Загрузка данных о погоде...'}
           </div>
         )}
 
         {error && (
           <div className="status-card error-card glass-card">
-            <div className="error-title">{lang === Language.English ? 'Error' : 'Ошибка'}</div>
+            <div className="error-title">
+              {lang === Language.English ? 'Error' : 'Ошибка'}
+            </div>
             <div className="error-message">{error}</div>
           </div>
         )}
@@ -160,7 +218,9 @@ export default function YarikWeatherApp() {
 
         {!loading && !error && !weather && !settings.first_time && (
           <div className="status-card glass-card">
-            {lang === Language.English ? 'Search for a city to see the weather.' : 'Введите город, чтобы увидеть погоду.'}
+            {lang === Language.English
+              ? 'Search for a city to see the weather.'
+              : 'Введите город, чтобы увидеть погоду.'}
           </div>
         )}
 
@@ -170,7 +230,8 @@ export default function YarikWeatherApp() {
             theme={resolvedTheme}
             onSave={handleSaveSettings}
             onClose={() => setShowSettings(false)}
-            onChange={s => setSettings(s)}
+            onChange={(s) => setSettings(s)}
+            isTauri={runningInTauri}
           />
         )}
 
@@ -185,7 +246,7 @@ export default function YarikWeatherApp() {
         {showWelcome && (
           <WelcomeModal
             onComplete={handleWelcomeComplete}
-            onChange={s => setSettings(s)}
+            onChange={(s) => setSettings(s)}
           />
         )}
 

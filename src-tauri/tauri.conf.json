@@ -4,7 +4,7 @@
   "version": "0.1.0",
   "identifier": "com.yarikstudio.yarikweather",
   "build": {
-    "frontendDist": "../frontend/dist-android"
+    "frontendDist": "../frontend/dist-desktop"
   },
   "app": {
     "windows": [
