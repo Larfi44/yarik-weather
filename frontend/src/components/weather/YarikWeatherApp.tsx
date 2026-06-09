@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import Image from 'next/image';
 import {
   Language,
   Theme,
@@ -137,10 +138,12 @@ export default function YarikWeatherApp() {
       <div className="app-container">
         <div className="header glass-card">
           <div className="brand">
-            <img
+            <Image
               src="/favicon.svg"
               className="header-icon"
               alt="Yarik Weather"
+              width={32}
+              height={32}
             />
             <h1>Yarik Weather</h1>
           </div>

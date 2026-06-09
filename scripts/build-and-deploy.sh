@@ -13,8 +13,8 @@ echo ">>> Deploying backends..."
 ./build-and-deploy-backend.sh
 echo ""
 
-# ---- macOS Desktop ----
-echo ">>> Building macOS..."
+# ---- MacOS Desktop ----
+echo ">>> Building mMcOS..."
 ./build-and-deploy-macos.sh
 echo ""
 
@@ -26,11 +26,6 @@ echo ""
 # ---- Android Mobile ----
 echo ">>> Building Android..."
 ./build-and-deploy-android.sh
-echo ""
-
-# ---- Web Frontend ----
-echo ">>> Building & deploying web frontend..."
-./build-and-deploy-frontend.sh
 echo ""
 
 # ---- Final Cleanup ----

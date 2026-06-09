@@ -1,11 +1,11 @@
-import type { Metadata } from "next";
-import "./globals.css";
+import type { Metadata } from 'next';
+import './globals.css';
 
 export const metadata: Metadata = {
-  title: "Yarik Weather",
-  description: "Weather app with AI recommendations",
+  title: 'Yarik Weather',
+  description: 'Weather app with AI recommendations',
   icons: {
-    icon: "/favicon.svg",
+    icon: '/favicon.svg',
   },
 };
 
@@ -16,9 +16,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body>
-        {children}
-      </body>
+      <body>{children}</body>
     </html>
   );
 }

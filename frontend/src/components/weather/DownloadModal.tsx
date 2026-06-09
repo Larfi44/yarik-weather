@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Image from 'next/image';
 import { Language, Theme } from '@/lib/settings';
 
 type DownloadOs = 'android' | 'windows' | 'macos' | 'linux';
@@ -113,10 +114,12 @@ export default function DownloadModal({
                 className={`download-card${selected === os ? ' active' : ''}`}
                 onClick={() => setSelected(os)}
               >
-                <img
+                <Image
                   className="download-card-icon"
                   src={getIcon(os, theme)}
                   alt={downloadLabel(os)}
+                  width={48}
+                  height={48}
                 />
                 <div className="download-card-title">{downloadLabel(os)}</div>
                 <div className="download-card-desc">
