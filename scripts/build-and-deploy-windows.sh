@@ -33,7 +33,8 @@ sips -z 32 32 /tmp/icon.png --out ../src-tauri/icons/32x32.png
 sips -z 128 128 /tmp/icon.png --out ../src-tauri/icons/128x128.png
 sips -z 256 256 /tmp/icon.png --out ../src-tauri/icons/128x128@2x.png
 sips -z 256 256 /tmp/icon.png --out ../src-tauri/icons/icon.icns
-sips -z 256 256 /tmp/icon.png --out ../src-tauri/icons/icon.ico
+# Use ImageMagick for ICO — sips generates PNG-with-.ico which breaks llvm-rc
+magick convert /tmp/icon.png -define icon:auto-resize=256,128,64,48,32,16 ../src-tauri/icons/icon.ico
 sips -z 512 512 /tmp/icon.png --out ../src-tauri/icons/512x512.png
 
 cd ..
