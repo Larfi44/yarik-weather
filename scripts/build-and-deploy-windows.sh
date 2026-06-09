@@ -53,7 +53,7 @@ if ! command -v cargo-xwin &> /dev/null; then
     cargo install cargo-xwin
 fi
 
-cargo tauri build --target x86_64-pc-windows-msvc 2>&1 | tee /tmp/windows-build.log
+cargo xwin tauri build --target x86_64-pc-windows-msvc 2>&1 | tee /tmp/windows-build.log
 
 # ---- Restore tauri config ----
 sed -i '' 's|"frontendDist": "../frontend/dist-desktop"|"frontendDist": "../frontend/dist-android"|' src-tauri/tauri.conf.json

@@ -9,9 +9,9 @@ echo "========================================="
 echo ""
 
 # ---- MacOS Desktop ----
-echo ">>> Building MacOS..."
-./build-and-deploy-macos.sh
-echo ""
+# echo ">>> Building MacOS..."
+# ./build-and-deploy-macos.sh
+# echo ""
 
 # ---- Windows Desktop ----
 echo ">>> Building Windows..."
