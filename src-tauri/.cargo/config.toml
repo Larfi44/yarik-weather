@@ -1,4 +1,0 @@
-# Reduce peak memory usage during Android cross-compilation
-[profile.release]
-# More codegen units = less peak memory, slightly slower binary
-codegen-units = 4

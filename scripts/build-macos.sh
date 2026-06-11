@@ -39,18 +39,18 @@ sips -z 512 512 /tmp/icon.png --out ../src-tauri/icons/512x512.png
 cd ..
 
 # ---- Update tauri config for desktop ----
-echo "Configuring Tauri for macOS desktop..."
+echo "Configuring Tauri for MacOS desktop..."
 sed -i '' 's|"frontendDist": "../frontend/dist-android"|"frontendDist": "../frontend/dist-desktop"|' src-tauri/tauri.conf.json
 
 # ---- Build macOS app ----
-echo "Building macOS app..."
+echo "Building MacOS app..."
 cargo tauri build --target aarch64-apple-darwin 2>&1 | tee /tmp/macos-build.log
 
 # ---- Restore tauri config ----
 sed -i '' 's|"frontendDist": "../frontend/dist-desktop"|"frontendDist": "../frontend/dist-android"|' src-tauri/tauri.conf.json
 
 # ---- Copy to downloads ----
-echo "Copying macOS builds to downloads..."
+echo "Copying MacOS builds to downloads..."
 mkdir -p frontend/public/downloads
 
 # Find and copy the DMG

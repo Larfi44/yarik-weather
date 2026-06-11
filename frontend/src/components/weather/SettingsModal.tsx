@@ -267,7 +267,7 @@ export default function SettingsModal({
               textDecoration: 'none',
             }}
           >
-            {lang === Language.English ? '❤️ Donate' : '❤️ Пожертвовать'}
+            {lang === Language.English ? '❤️ Donate' : '❤️ Поддержать'}
           </button>
         </div>
       </div>

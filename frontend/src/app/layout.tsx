@@ -16,25 +16,6 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <head>
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `
-              (function() {
-                try {
-                  var settings = JSON.parse(localStorage.getItem('weather_settings') || '{}');
-                  var theme = settings.theme || 'auto';
-                  var prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-                  var isDark = theme === 'dark' || (theme === 'auto' && prefersDark);
-                  document.documentElement.classList.add(isDark ? 'theme-dark' : 'theme-light');
-                } catch(e) {
-                  document.documentElement.classList.add('theme-light');
-                }
-              })();
-            `,
-          }}
-        />
-      </head>
       <body>{children}</body>
     </html>
   );

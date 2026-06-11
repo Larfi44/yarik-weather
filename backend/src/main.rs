@@ -507,14 +507,17 @@ async fn get_coordinates(client: &Client, city: &str) -> anyhow::Result<(f64, f6
     Ok((results[0].latitude, results[0].longitude))
 }
 
-async fn fetch_forecast(client: &Client, lat: f64, lon: f64) -> anyhow::Result<OpenMeteoForecast> {
+async fn fetch_forecast(client: &Client, lat: f64, lon: f64, city: &str) -> anyhow::Result<OpenMeteoForecast> {
+    let coastal = is_coastal_city(city);
+    let sea_current = if coastal { "sea_surface_temperature," } else { "" };
+    let sea_hourly = if coastal { "sea_surface_temperature," } else { "" };
     let url: String = format!(
         "https://api.open-meteo.com/v1/forecast?latitude={:.4}&longitude={:.4}&\
-    current=temperature_2m,wind_speed_10m,weather_code,surface_pressure,sea_surface_temperature,uv_index&\
-    hourly=temperature_2m,wind_speed_10m,weather_code,surface_pressure,sea_surface_temperature,uv_index,precipitation_probability&\
+    current=temperature_2m,wind_speed_10m,weather_code,surface_pressure,{}uv_index&\
+    hourly=temperature_2m,wind_speed_10m,weather_code,surface_pressure,{}uv_index,precipitation_probability&\
     daily=temperature_2m_max,temperature_2m_min,wind_speed_10m_max,weather_code,sunrise,sunset,uv_index_max,precipitation_probability_max&\
     timezone=auto&forecast_days=8",
-        lat, lon
+        lat, lon, sea_current, sea_hourly
     );
     fetch_json(client, &url).await
 }
@@ -581,8 +584,9 @@ async fn fetch_yesterday(client: &Client, lat: f64, lon: f64) -> anyhow::Result<
 async fn get_weather_data(client: &Client, city: &str) -> anyhow::Result<WeatherResponse> {
     let (lat, lon) = get_coordinates(client, city).await?;
     let latitude = lat; // store for AI
+    let city_owned = city.to_string();
     let (forecast_res, yesterday_res) = tokio::join!(
-        fetch_forecast(client, lat, lon),
+        fetch_forecast(client, lat, lon, &city_owned),
         fetch_yesterday(client, lat, lon)
     );
     let forecast = forecast_res?;

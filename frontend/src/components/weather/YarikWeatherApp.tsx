@@ -40,6 +40,12 @@ export default function YarikWeatherApp() {
   const [initialFetchDone, setInitialFetchDone] = useState(false);
 
   const runningInTauri = isTauri();
+  const [mounted, setMounted] = useState(false);
+
+  // Mark as mounted (client-side only)
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   // Detect system theme
   useEffect(() => {
@@ -166,8 +172,8 @@ export default function YarikWeatherApp() {
             >
               AI
             </button>
-            {/* Download button: temporarily hidden until GitHub Release is published */}
-            {false && !runningInTauri && (
+            {/* Download button: only on website, not in Tauri (desktop/mobile) app */}
+            {!runningInTauri && (
               <button
                 className="icon-btn"
                 onClick={() => setShowDownloads(true)}
@@ -216,7 +222,7 @@ export default function YarikWeatherApp() {
           />
         )}
 
-        {!loading && !error && !weather && !settings.first_time && (
+        {!loading && !error && !weather && !settings.first_time && mounted && (
           <div className="status-card glass-card">
             {lang === Language.English
               ? 'Search for a city to see the weather.'
