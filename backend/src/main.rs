@@ -271,7 +271,6 @@ struct CurrentData {
     wind_speed: f64,
     condition: String,
     pressure: f64,
-    #[serde(skip_serializing_if = "Option::is_none")]
     sea_temperature: Option<f64>,
     uv_index: f64,
     precipitation_probability: f64,
@@ -288,7 +287,6 @@ struct HourlyData {
     wind_speed: f64,
     condition: String,
     pressure: f64,
-    #[serde(skip_serializing_if = "Option::is_none")]
     sea_temperature: Option<f64>,
     uv_index: f64,
     precipitation_probability: f64,

@@ -21,6 +21,8 @@ cp -r .next/static dist-android/_next/
 rsync -av --exclude='downloads' public/ dist-android/
 cp out/index.html dist-android/ 2>/dev/null || cp .next/server/app/index.html dist-android/index.html
 
+echo "  Web assets copied (paths unmodified — Tauri handles serving natively)"
+
 echo "  Web assets prepared in dist-android/"
 
 # Remove node_modules to prevent it from being bundled into APK (saves ~500MB+)
@@ -31,22 +33,40 @@ rm -rf node_modules
 echo "Generating Android icon..."
 mkdir -p ../src-tauri/icons
 
-# Convert SVG to PNG using ImageMagick (more reliable for automation)
-if ! command -v magick &> /dev/null; then
-    echo "ImageMagick not found. Installing via Homebrew..."
-    brew install imagemagick
-fi
+# Render SVG to PNG master, then use Pillow for proper RGBA output
+pip3 install Pillow -q 2>/dev/null
+magick convert -background none -density 300 ../frontend/public/favicon.svg -resize 1024x1024 -alpha on /tmp/icon-master.png
 
-# Convert SVG to PNG
-magick convert ../frontend/public/favicon.svg /tmp/icon.png
+python3 << 'PYEOF'
+from PIL import Image
+img = Image.open('/tmp/icon-master.png').convert('RGBA')
+sizes = {'32x32.png':32,'128x128.png':128,'128x128@2x.png':256,'512x512.png':512,'icon.png':512}
+for f,s in sizes.items():
+    r = img.resize((s,s), Image.LANCZOS)
+    r.save('../src-tauri/icons/'+f,'PNG')
+    print(f'{f}: RGBA {s}x{s}')
 
-# Resize and create various icon sizes using ImageMagick with alpha channel
-magick convert /tmp/icon.png -define png:color-type=6 -resize 32x32 ../src-tauri/icons/32x32.png
-magick convert /tmp/icon.png -define png:color-type=6 -resize 128x128 ../src-tauri/icons/128x128.png
-magick convert /tmp/icon.png -define png:color-type=6 -resize 256x256 ../src-tauri/icons/128x128@2x.png
-magick convert /tmp/icon.png -define png:color-type=6 -resize 256x256 ../src-tauri/icons/icon.icns
-magick convert /tmp/icon.png -define png:color-type=6 -resize 256x256 ../src-tauri/icons/icon.ico
-magick convert /tmp/icon.png -define png:color-type=6 -resize 512x512 ../src-tauri/icons/512x512.png
+# Also generate for icns iconset
+import os, subprocess
+os.makedirs('/tmp/icon.iconset', exist_ok=True)
+for s in [16,32,64,128,256,512]:
+    r = img.resize((s,s), Image.LANCZOS)
+    r.save(f'/tmp/icon.iconset/icon_{s}x{s}.png','PNG')
+# retina copies
+import shutil
+shutil.copy('/tmp/icon.iconset/icon_32x32.png','/tmp/icon.iconset/icon_16x16@2x.png')
+shutil.copy('/tmp/icon.iconset/icon_64x64.png','/tmp/icon.iconset/icon_32x32@2x.png')
+shutil.copy('/tmp/icon.iconset/icon_256x256.png','/tmp/icon.iconset/icon_128x128@2x.png')
+subprocess.run(['iconutil','-c','icns','/tmp/icon.iconset','-o','../src-tauri/icons/icon.icns'])
+shutil.rmtree('/tmp/icon.iconset')
+
+# ICO
+r = img.resize((256,256), Image.LANCZOS)
+r.save('../src-tauri/icons/icon.ico', 'ICO', sizes=[(256,256),(128,128),(64,64),(32,32),(16,16)])
+print('icon.ico generated')
+PYEOF
+
+echo "  Icons generated (all RGBA)"
 
 cd ..
 
@@ -60,45 +80,6 @@ export TAURI_ANDROID_TARGETS="aarch64"
 echo "Initializing Android project..."
 rm -rf src-tauri/gen/android
 cargo tauri android init
-
-# ---- Inject widget receiver into the generated AndroidManifest.xml ----
-echo "Injecting widget receiver into AndroidManifest.xml..."
-sed -i '' '/<\/application>/i \
-    <receiver android:name="com.yarikstudio.yarikweather.widget.YarikWeatherWidget" android:exported="true"> \
-        <intent-filter> \
-            <action android:name="android.appwidget.action.APPWIDGET_UPDATE" /> \
-        </intent-filter> \
-        <meta-data android:name="android.appwidget.provider" android:resource="@xml/yarik_weather_widget_info" /> \
-    </receiver>' src-tauri/gen/android/app/src/main/AndroidManifest.xml
-
-# ---- Create widget info XML ----
-echo "Creating widget info XML..."
-mkdir -p src-tauri/gen/android/app/src/main/res/xml
-cat > src-tauri/gen/android/app/src/main/res/xml/yarik_weather_widget_info.xml << 'EOF'
-<?xml version="1.0" encoding="utf-8"?>
-<appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
-    android:minWidth="40dp"
-    android:minHeight="40dp"
-    android:updatePeriodMillis="1800000"
-    android:previewImage="@mipmap/ic_launcher"
-    android:initialLayout="@layout/widget_layout"
-    android:resizeMode="horizontal|vertical"
-    android:widgetCategory="home_screen">
-</appwidget-provider>
-EOF
-
-# ---- Create minimal widget layout XML (required by the widget provider) ----
-echo "Creating widget layout XML..."
-mkdir -p src-tauri/gen/android/app/src/main/res/layout
-cat > src-tauri/gen/android/app/src/main/res/layout/widget_layout.xml << 'EOF'
-<?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:layout_width="match_parent"
-    android:layout_height="match_parent"
-    android:orientation="vertical"
-    android:gravity="center">
-</LinearLayout>
-EOF
 
 # ---- Build APK ----
 echo "Building APK (aarch64)..."
@@ -139,6 +120,6 @@ rm -f YarikWeather-Android.apk
 
 echo ""
 echo "========================================="
-echo "  ✅ Android APK ready!"
+echo "  ✅ Android .apk ready!"
 echo "  frontend/public/downloads/YarikWeather-Android.apk"
 echo "========================================="

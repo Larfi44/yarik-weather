@@ -213,7 +213,7 @@ export default function WeatherDisplay({
           const precipS = `${lang === Language.English ? 'Precipitation' : 'Осадки'}: ${Math.round(h.precipitation_probability)}%`;
           const pressureVal = convertPressure(h.pressure, pressure_unit);
           const pressureS = `${lang === Language.English ? 'Pressure' : 'Давление'}: ${pressureVal.toFixed(1)} ${pStr} (${translateCategory(pressureCategory(h.pressure), lang)})`;
-          const uvS = `☀️ ${h.uv_index.toFixed(1)} (${translateCategory(uvCategory(h.uv_index), lang)})`;
+          const uvS = `☀️ ${(h.uv_index ?? 0).toFixed(1)} (${translateCategory(uvCategory(h.uv_index ?? 0), lang)})`;
           return {
             condText,
             condIcon: conditionIconFromText(h.condition),
@@ -277,7 +277,7 @@ export default function WeatherDisplay({
           const windCat = windCategory(day.wind_speed_max);
           const windS = `${lang === Language.English ? 'Wind' : 'Ветер'}: ${windVal.toFixed(1)} ${wStr} (${translateCategory(windCat, lang)})`;
           const precipS = `${lang === Language.English ? 'Precipitation' : 'Осадки'}: ${Math.round(day.precipitation_probability_max)}%`;
-          const uvS = `☀️ ${day.uv_index_max.toFixed(1)} (${translateCategory(uvCategory(day.uv_index_max), lang)})`;
+          const uvS = `☀️ ${(day.uv_index_max ?? 0).toFixed(1)} (${translateCategory(uvCategory(day.uv_index_max ?? 0), lang)})`;
           return {
             condText,
             condIcon: conditionIconFromText(day.condition),
@@ -386,13 +386,16 @@ export default function WeatherDisplay({
           </p>
           <p>
             ☀️ {lang === Language.English ? 'UV Index' : 'УФ-индекс'}:{' '}
-            {data.current.uv_index.toFixed(1)} (
-            {translateCategory(uvCategory(data.current.uv_index), lang)})
+            {(data.current.uv_index ?? 0).toFixed(1)} (
+            {translateCategory(uvCategory(data.current.uv_index ?? 0), lang)})
           </p>
           {data.current.sea_temperature != null && isCoastal(data.city) && (
             <p>
               🌊 {lang === Language.English ? 'Sea temp' : 'Темп. моря'}:{' '}
-              {convertTemp(data.current.sea_temperature, temp_unit).toFixed(1)}
+              {convertTemp(
+                data.current.sea_temperature ?? 0,
+                temp_unit,
+              ).toFixed(1)}
               {tStr}
             </p>
           )}

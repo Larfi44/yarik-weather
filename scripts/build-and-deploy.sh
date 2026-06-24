@@ -14,7 +14,7 @@ echo ">>> Deploying backends..."
 echo ""
 
 # ---- MacOS Desktop ----
-echo ">>> Building mMcOS..."
+echo ">>> Building MacOS..."
 ./build-and-deploy-macos.sh
 echo ""
 

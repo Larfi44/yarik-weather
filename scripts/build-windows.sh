@@ -24,18 +24,40 @@ echo "  Web assets prepared in dist-desktop/"
 echo "Generating Windows icon..."
 mkdir -p ../src-tauri/icons
 
-# Convert SVG to PNG using qlmanage (macOS built-in)
-qlmanage -t -s 1024 -o /tmp public/favicon.svg 2>/dev/null
-mv /tmp/favicon.svg.png /tmp/icon.png 2>/dev/null
+# Use ImageMagick for all icon generation (most reliable SVG→PNG conversion)
+if ! command -v magick &> /dev/null; then
+    echo "ImageMagick not found. Installing via Homebrew..."
+    brew install imagemagick
+fi
 
-# Resize and create various icon sizes
-sips -z 32 32 /tmp/icon.png --out ../src-tauri/icons/32x32.png
-sips -z 128 128 /tmp/icon.png --out ../src-tauri/icons/128x128.png
-sips -z 256 256 /tmp/icon.png --out ../src-tauri/icons/128x128@2x.png
-sips -z 256 256 /tmp/icon.png --out ../src-tauri/icons/icon.icns
-# Use ImageMagick for ICO — sips generates PNG-with-.ico which breaks llvm-rc
-magick convert /tmp/icon.png -define icon:auto-resize=256,128,64,48,32,16 ../src-tauri/icons/icon.ico
-sips -z 512 512 /tmp/icon.png --out ../src-tauri/icons/512x512.png
+# Convert SVG to a high-res PNG master (1024x1024) with transparency
+magick convert -background none -density 300 ../frontend/public/favicon.svg -resize 1024x1024 /tmp/icon-master.png
+
+# Generate PNG icons at all required sizes
+magick convert /tmp/icon-master.png -resize 32x32   ../src-tauri/icons/32x32.png
+magick convert /tmp/icon-master.png -resize 128x128 ../src-tauri/icons/128x128.png
+magick convert /tmp/icon-master.png -resize 256x256 ../src-tauri/icons/128x128@2x.png
+magick convert /tmp/icon-master.png -resize 512x512 ../src-tauri/icons/512x512.png
+magick convert /tmp/icon-master.png -resize 512x512 ../src-tauri/icons/icon.png
+
+# Generate proper .icns using iconutil (macOS native, correct format)
+mkdir -p /tmp/icon.iconset
+magick convert /tmp/icon-master.png -resize 16x16     /tmp/icon.iconset/icon_16x16.png
+magick convert /tmp/icon-master.png -resize 32x32     /tmp/icon.iconset/icon_32x32.png
+magick convert /tmp/icon-master.png -resize 64x64     /tmp/icon.iconset/icon_64x64.png
+magick convert /tmp/icon-master.png -resize 128x128   /tmp/icon.iconset/icon_128x128.png
+magick convert /tmp/icon-master.png -resize 256x256   /tmp/icon.iconset/icon_256x256.png
+magick convert /tmp/icon-master.png -resize 512x512   /tmp/icon.iconset/icon_512x512.png
+cp /tmp/icon.iconset/icon_32x32.png  /tmp/icon.iconset/icon_16x16@2x.png
+cp /tmp/icon.iconset/icon_64x64.png  /tmp/icon.iconset/icon_32x32@2x.png
+cp /tmp/icon.iconset/icon_256x256.png /tmp/icon.iconset/icon_128x128@2x.png
+iconutil -c icns /tmp/icon.iconset -o ../src-tauri/icons/icon.icns
+rm -rf /tmp/icon.iconset
+
+# Generate proper .ico for Windows
+magick convert /tmp/icon-master.png -define icon:auto-resize=256,128,64,48,32,16 ../src-tauri/icons/icon.ico
+
+rm -f /tmp/icon-master.png
 
 cd ..
 

@@ -1,7 +1,6 @@
 'use client';
 
 import { useState } from 'react';
-import { useTheme } from 'next-themes';
 import { assetUrl } from '@/lib/assets';
 import { isCoastal } from '@/lib/coastal';
 import { fetchWeather } from '@/lib/api';
@@ -12,6 +11,7 @@ interface AiModalProps {
   open: boolean;
   onClose: () => void;
   weather: WeatherResponse;
+  theme?: 'light' | 'dark';
 }
 
 // ── Scoring helpers matching ai_service.py ──────────────────────────
@@ -74,9 +74,14 @@ function swimScore(
   return Math.round(Math.max(0, Math.min(10, s)) * 10) / 10;
 }
 
-export default function AiModal({ open, onClose, weather }: AiModalProps) {
+export default function AiModal({
+  open,
+  onClose,
+  weather,
+  theme,
+}: AiModalProps) {
   const language = getSettings().language;
-  const { resolvedTheme } = useTheme();
+  const resolvedTheme = theme ?? 'light';
   const [loading, setLoading] = useState(false);
   const [todayData, setTodayData] = useState<{
     recommendations: string[];

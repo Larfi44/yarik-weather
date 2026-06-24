@@ -76,7 +76,7 @@ backend/ai/*.pkl
 # Logs
 frontend/dev.log
 
-# Android APK
+# Android .apk
 *.apk
 *.apk.idsig
 
