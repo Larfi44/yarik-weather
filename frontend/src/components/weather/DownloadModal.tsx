@@ -10,6 +10,7 @@ interface DownloadModalProps {
   lang: Language;
   theme: Theme;
   onClose: () => void;
+  isTauri?: boolean;
 }
 
 /** Base URL for downloading from GitHub Releases */
@@ -72,9 +73,26 @@ export default function DownloadModal({
   lang,
   theme,
   onClose,
+  isTauri,
 }: DownloadModalProps) {
   const [selected, setSelected] = useState<DownloadOs>('android');
   const oss: DownloadOs[] = ['android', 'windows', 'macos', 'linux'];
+
+  const handleDownload = async (e: React.MouseEvent<HTMLAnchorElement>) => {
+    e.preventDefault();
+    const url = downloadUrl(selected);
+    if (isTauri) {
+      try {
+        const { openUrl } = await import('@tauri-apps/plugin-opener');
+        await openUrl(url);
+      } catch (err) {
+        console.error('Failed to open URL:', err);
+        window.open(url, '_blank', 'noopener,noreferrer');
+      }
+    } else {
+      window.open(url, '_blank', 'noopener,noreferrer');
+    }
+  };
 
   const installRustCommand =
     "curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh";
@@ -149,8 +167,7 @@ export default function DownloadModal({
             <a
               className="primary-btn download-confirm-btn"
               href={downloadUrl(selected)}
-              target="_blank"
-              rel="noopener noreferrer"
+              onClick={handleDownload}
               style={{ textDecoration: 'none', display: 'inline-block' }}
             >
               {lang === Language.English ? 'Download' : 'Скачать'}

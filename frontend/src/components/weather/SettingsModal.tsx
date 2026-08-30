@@ -10,7 +10,6 @@ import {
   PressureUnit,
   choiceBtnClass,
 } from '@/lib/settings';
-import { tempUnitStr, windUnitStr, pressureUnitStr } from '@/lib/settings';
 
 interface SettingsModalProps {
   settings: UserSettings;
@@ -47,40 +46,72 @@ export default function SettingsModal({
     onClose();
   };
 
-  const openLink = (url: string) => {
+  const handleExternalLink = async (
+    e: React.MouseEvent<HTMLAnchorElement>,
+    url: string,
+  ) => {
+    e.preventDefault();
     if (isTauri) {
-      // Use dynamic import to avoid issues when not in Tauri
-      import('@tauri-apps/plugin-opener')
-        .then((mod) => {
-          mod.openUrl(url);
-        })
-        .catch(() => {
-          window.open(url, '_blank', 'noopener,noreferrer');
-        });
+      try {
+        const { openUrl } = await import('@tauri-apps/plugin-opener');
+        await openUrl(url);
+      } catch (err) {
+        console.error('Failed to open URL:', err);
+        window.open(url, '_blank', 'noopener,noreferrer');
+      }
     } else {
       window.open(url, '_blank', 'noopener,noreferrer');
     }
   };
 
+  const openDonate = async () => {
+    const url = 'https://pay.cloudtips.ru/p/b94e349b';
+    if (isTauri) {
+      try {
+        const { openUrl } = await import('@tauri-apps/plugin-opener');
+        await openUrl(url);
+      } catch (err) {
+        console.error('Failed to open URL:', err);
+        window.open(url, '_blank', 'noopener,noreferrer');
+      }
+    } else {
+      window.open(url, '_blank', 'noopener,noreferrer');
+    }
+  };
+
+  const isDark = theme === Theme.Dark;
+  const textColor = isDark ? '#e5e7eb' : '#1a1a1a';
+  const linkColor = '#4a9eff';
+
   return (
     <div className="modal-overlay">
       <div className="modal">
         <div className="modal-topbar">
-          <h2 style={{ flex: 1, textAlign: 'center' }}>
+          <h2 style={{ flex: 1, textAlign: 'center', color: textColor }}>
             {lang === Language.English ? 'Settings' : 'Настройки'}
           </h2>
           <button
             className="modal-close"
             onClick={handleClose}
             aria-label="Close"
-            style={{ cursor: 'pointer', position: 'absolute', right: '24px' }}
+            style={{
+              cursor: 'pointer',
+              position: 'absolute',
+              right: '24px',
+              color: textColor,
+              background: 'none',
+              border: 'none',
+              fontSize: '1.2rem',
+            }}
           >
-            ✖
+            ✕
           </button>
         </div>
 
         <div className="setting-row">
-          <label>{lang === Language.English ? 'Language:' : 'Язык:'}</label>
+          <label style={{ color: textColor }}>
+            {lang === Language.English ? 'Language:' : 'Язык:'}
+          </label>
           <div className="choice-group">
             <button
               className={choiceBtnClass(temp.language === Language.English)}
@@ -98,7 +129,7 @@ export default function SettingsModal({
         </div>
 
         <div className="setting-row">
-          <label>
+          <label style={{ color: textColor }}>
             {lang === Language.English
               ? 'Temperature unit:'
               : 'Единица температуры:'}
@@ -126,7 +157,7 @@ export default function SettingsModal({
         </div>
 
         <div className="setting-row">
-          <label>
+          <label style={{ color: textColor }}>
             {lang === Language.English ? 'Wind unit:' : 'Единица ветра:'}
           </label>
           <div className="choice-group">
@@ -152,7 +183,7 @@ export default function SettingsModal({
         </div>
 
         <div className="setting-row">
-          <label>
+          <label style={{ color: textColor }}>
             {lang === Language.English ? 'Pressure unit:' : 'Единица давления:'}
           </label>
           <div className="choice-group">
@@ -184,7 +215,9 @@ export default function SettingsModal({
         </div>
 
         <div className="setting-row">
-          <label>{lang === Language.English ? 'Theme:' : 'Тема:'}</label>
+          <label style={{ color: textColor }}>
+            {lang === Language.English ? 'Theme:' : 'Тема:'}
+          </label>
           <div className="choice-group">
             <button
               className={choiceBtnClass(temp.theme === Theme.Auto)}
@@ -208,7 +241,7 @@ export default function SettingsModal({
         </div>
 
         <div className="setting-row">
-          <label>
+          <label style={{ color: textColor }}>
             {lang === Language.English
               ? 'Default city:'
               : 'Город по умолчанию:'}
@@ -217,6 +250,7 @@ export default function SettingsModal({
             className="text-input"
             value={temp.default_city}
             onChange={(e) => update({ default_city: e.target.value })}
+            style={{ color: textColor }}
           />
         </div>
 
@@ -227,28 +261,29 @@ export default function SettingsModal({
             fontSize: '0.85rem',
           }}
         >
-          <span style={{ color: theme === Theme.Light ? '#000' : '#fff' }}>
+          <span style={{ color: textColor }}>
             {lang === Language.English ? 'Developed by ' : 'Разработано '}
           </span>
-          <button
-            onClick={() =>
-              openLink(
-                'https://larfi44.github.io/Yarik-Studio.github.io/index.html',
+          <a
+            href="https://larfi44.github.io/yarik-studio/index.html"
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={(e) =>
+              handleExternalLink(
+                e,
+                'https://larfi44.github.io/yarik-studio/index.html',
               )
             }
             style={{
-              color: '#4a9eff',
+              color: linkColor,
               textDecoration: 'none',
               fontWeight: 600,
-              background: 'none',
-              border: 'none',
-              padding: 0,
               cursor: 'pointer',
               fontSize: 'inherit',
             }}
           >
             Yarik Studio
-          </button>
+          </a>
         </div>
 
         <div
@@ -259,7 +294,7 @@ export default function SettingsModal({
           }}
         >
           <button
-            onClick={() => openLink('https://pay.cloudtips.ru/p/b94e349b')}
+            onClick={openDonate}
             className="primary-btn"
             style={{
               fontSize: '0.9rem',

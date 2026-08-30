@@ -9,6 +9,7 @@ const nextConfig: NextConfig = {
   output: 'export',
   turbopack: {
     resolveExtensions: ['.tsx', '.ts', '.jsx', '.js', '.json'],
+    root: __dirname,
   },
   basePath: prefix,
   assetPrefix: isPages ? `/${repo}/` : '',

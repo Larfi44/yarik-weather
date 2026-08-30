@@ -21,8 +21,6 @@ cp -r .next/static dist-android/_next/
 rsync -av --exclude='downloads' public/ dist-android/
 cp out/index.html dist-android/ 2>/dev/null || cp .next/server/app/index.html dist-android/index.html
 
-echo "  Web assets copied (paths unmodified — Tauri handles serving natively)"
-
 echo "  Web assets prepared in dist-android/"
 
 # Remove node_modules to prevent it from being bundled into APK (saves ~500MB+)
@@ -30,45 +28,10 @@ echo "Removing node_modules to reduce APK size..."
 rm -rf node_modules
 
 # ---- Launcher icon ----
-echo "Generating Android icon..."
-mkdir -p ../src-tauri/icons
-
-# Render SVG to PNG master, then use Pillow for proper RGBA output
-pip3 install Pillow -q 2>/dev/null
-magick convert -background none -density 300 ../frontend/public/favicon.svg -resize 1024x1024 -alpha on /tmp/icon-master.png
-
-python3 << 'PYEOF'
-from PIL import Image
-img = Image.open('/tmp/icon-master.png').convert('RGBA')
-sizes = {'32x32.png':32,'128x128.png':128,'128x128@2x.png':256,'512x512.png':512,'icon.png':512}
-for f,s in sizes.items():
-    r = img.resize((s,s), Image.LANCZOS)
-    r.save('../src-tauri/icons/'+f,'PNG')
-    print(f'{f}: RGBA {s}x{s}')
-
-# Also generate for icns iconset
-import os, subprocess
-os.makedirs('/tmp/icon.iconset', exist_ok=True)
-for s in [16,32,64,128,256,512]:
-    r = img.resize((s,s), Image.LANCZOS)
-    r.save(f'/tmp/icon.iconset/icon_{s}x{s}.png','PNG')
-# retina copies
-import shutil
-shutil.copy('/tmp/icon.iconset/icon_32x32.png','/tmp/icon.iconset/icon_16x16@2x.png')
-shutil.copy('/tmp/icon.iconset/icon_64x64.png','/tmp/icon.iconset/icon_32x32@2x.png')
-shutil.copy('/tmp/icon.iconset/icon_256x256.png','/tmp/icon.iconset/icon_128x128@2x.png')
-subprocess.run(['iconutil','-c','icns','/tmp/icon.iconset','-o','../src-tauri/icons/icon.icns'])
-shutil.rmtree('/tmp/icon.iconset')
-
-# ICO
-r = img.resize((256,256), Image.LANCZOS)
-r.save('../src-tauri/icons/icon.ico', 'ICO', sizes=[(256,256),(128,128),(64,64),(32,32),(16,16)])
-print('icon.ico generated')
-PYEOF
-
-echo "  Icons generated (all RGBA)"
-
+echo "Generating icons..."
 cd ..
+python3 scripts/generate-icons.py
+echo "  Icons generated with cargo tauri icon"
 
 # ---- Update tauri config for Android ----
 echo "Configuring Tauri for Android..."

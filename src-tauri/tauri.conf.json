@@ -27,12 +27,7 @@
       "icons/32x32.png",
       "icons/128x128.png",
       "icons/128x128@2x.png",
-      "icons/48x48.png",
-      "icons/72x72.png",
-      "icons/96x96.png",
-      "icons/144x144.png",
-      "icons/192x192.png",
-      "icons/512x512.png",
+      "icons/icon.png",
       "icons/icon.icns",
       "icons/icon.ico"
     ],

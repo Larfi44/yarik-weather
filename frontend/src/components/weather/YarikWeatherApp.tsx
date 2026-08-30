@@ -149,7 +149,7 @@ export default function YarikWeatherApp() {
               className="header-icon"
               alt="Yarik Weather"
             />
-            <h1>Yarik Weather v2</h1>
+            <h1>Yarik Weather</h1>
           </div>
           <div className="header-buttons">
             <button
@@ -246,6 +246,7 @@ export default function YarikWeatherApp() {
             lang={lang}
             theme={resolvedTheme}
             onClose={() => setShowDownloads(false)}
+            isTauri={runningInTauri}
           />
         )}
 

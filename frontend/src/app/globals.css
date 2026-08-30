@@ -1,7 +1,7 @@
 @import 'tailwindcss';
 
 :root {
-  --accent: #006aff;
+  --accent: rgb(255, 125, 0);
   --accent2: #5a9e4b;
   --muted: #888;
   --text: #1a1a1a;
@@ -12,7 +12,7 @@
 }
 
 .theme-dark {
-  --accent: #e8913a;
+  --accent: rgb(255, 125, 0);
   --accent2: #6dbf6d;
   --muted: #9ca3af;
   --text: #e5e7eb;

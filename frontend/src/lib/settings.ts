@@ -71,17 +71,23 @@ export function saveSettings(settings: UserSettings): void {
 
 export function cycleTheme(theme: Theme): Theme {
   switch (theme) {
-    case Theme.Auto: return Theme.Light;
-    case Theme.Light: return Theme.Dark;
-    case Theme.Dark: return Theme.Auto;
+    case Theme.Auto:
+      return Theme.Light;
+    case Theme.Light:
+      return Theme.Dark;
+    case Theme.Dark:
+      return Theme.Auto;
   }
 }
 
 export function themeIcon(theme: Theme): string {
   switch (theme) {
-    case Theme.Auto: return '🌓';
-    case Theme.Light: return '☀️';
-    case Theme.Dark: return '🌙';
+    case Theme.Auto:
+      return '🌓';
+    case Theme.Light:
+      return '☀️';
+    case Theme.Dark:
+      return '🌙';
   }
 }
 
@@ -89,26 +95,41 @@ export function choiceBtnClass(active: boolean): string {
   return active ? 'choice-btn active' : 'choice-btn';
 }
 
-export function tempUnitStr(unit: TempUnit, lang: Language): string {
+export function tempUnitStr(unit: TempUnit, _lang: Language): string {
   switch (unit) {
-    case TempUnit.Celsius: return '°C';
-    case TempUnit.Fahrenheit: return '°F';
-    case TempUnit.Kelvin: return 'K';
+    case TempUnit.Celsius:
+      return '°C';
+    case TempUnit.Fahrenheit:
+      return '°F';
+    case TempUnit.Kelvin:
+      return 'K';
+    default:
+      return '°C';
   }
 }
 
 export function windUnitStr(unit: WindUnit, lang: Language): string {
   switch (unit) {
-    case WindUnit.Mps: return lang === Language.English ? 'm/s' : 'м/с';
-    case WindUnit.Kmph: return lang === Language.English ? 'km/h' : 'км/ч';
-    case WindUnit.Mph: return lang === Language.English ? 'mph' : 'миль/ч';
+    case WindUnit.Mps:
+      return lang === Language.English ? 'm/s' : 'м/с';
+    case WindUnit.Kmph:
+      return lang === Language.English ? 'km/h' : 'км/ч';
+    case WindUnit.Mph:
+      return lang === Language.English ? 'mph' : 'миль/ч';
+    default:
+      return lang === Language.English ? 'm/s' : 'м/с';
   }
 }
 
 export function pressureUnitStr(unit: PressureUnit, lang: Language): string {
   switch (unit) {
-    case PressureUnit.HPa: return lang === Language.English ? 'hPa' : 'гПа';
-    case PressureUnit.MmHg: return lang === Language.English ? 'mmHg' : 'мм рт. ст.';
-    case PressureUnit.InHg: return lang === Language.English ? 'inHg' : 'дюйм рт. ст.';
+    case PressureUnit.HPa:
+      return lang === Language.English ? 'hPa' : 'гПа';
+    case PressureUnit.MmHg:
+      return lang === Language.English ? 'mmHg' : 'мм рт. ст.';
+    case PressureUnit.InHg:
+      return lang === Language.English ? 'inHg' : 'дюйм рт. ст.';
+    default:
+      return lang === Language.English ? 'hPa' : 'гПа';
   }
 }

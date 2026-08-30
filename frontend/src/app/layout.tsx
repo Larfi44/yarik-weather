@@ -16,7 +16,41 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body>{children}</body>
+      <body>
+        {children}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              // Intercept all link clicks and navigate to external URLs via Tauri opener
+              document.addEventListener('click', function(e) {
+                var a = e.target.closest('a[href]');
+                if (!a) return;
+                var href = a.getAttribute('href');
+                if (!href) return;
+                // Only intercept external http(s) links
+                if (href.startsWith('http://') || href.startsWith('https://')) {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  // Try Tauri opener plugin if available
+                  if (window.__TAURI_INTERNALS__) {
+                    try {
+                      import('@tauri-apps/plugin-opener').then(function(mod) {
+                        mod.openUrl(href);
+                      }).catch(function() {
+                        window.open(href, '_blank', 'noopener,noreferrer');
+                      });
+                    } catch(err) {
+                      window.open(href, '_blank', 'noopener,noreferrer');
+                    }
+                  } else {
+                    window.open(href, '_blank', 'noopener,noreferrer');
+                  }
+                }
+              }, true);
+            `,
+          }}
+        />
+      </body>
     </html>
   );
 }
