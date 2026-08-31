@@ -1,0 +1,2 @@
+# Disable GitVerse Pages' built-in Jekyll processing for this repository,
+# so underscore-prefixed folders like frontend/out/_next are served as-is.
