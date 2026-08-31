@@ -8,6 +8,7 @@ import {
   TempUnit,
   WindUnit,
   getSettings,
+  getDefaultSettings,
   saveSettings,
   cycleTheme,
   themeIcon,
@@ -28,7 +29,8 @@ function isTauri(): boolean {
 }
 
 export default function YarikWeatherApp() {
-  const [settings, setSettings] = useState<UserSettings>(getSettings);
+  const [settings, setSettings] = useState<UserSettings>(getDefaultSettings);
+  const [settingsReady, setSettingsReady] = useState(false);
   const [systemTheme, setSystemTheme] = useState<Theme>(Theme.Light);
   const [weather, setWeather] = useState<WeatherResponse | null>(null);
   const [loading, setLoading] = useState(false);
@@ -45,6 +47,13 @@ export default function YarikWeatherApp() {
   // Mark as mounted (client-side only)
   useEffect(() => {
     setMounted(true);
+  }, []);
+
+  // Load saved settings from localStorage after mount (avoids hydration
+  // mismatch between the server-rendered defaults and client-side storage)
+  useEffect(() => {
+    setSettings(getSettings());
+    setSettingsReady(true);
   }, []);
 
   // Detect system theme
@@ -80,10 +89,11 @@ export default function YarikWeatherApp() {
     root.classList.add(themeClass);
   }, [themeClass]);
 
-  // Show welcome on first visit
+  // Show welcome on first visit (only after saved settings are loaded,
+  // so returning users with first_time=false don't see it)
   useEffect(() => {
-    if (settings.first_time) setShowWelcome(true);
-  }, []);
+    if (settingsReady && settings.first_time) setShowWelcome(true);
+  }, [settingsReady, settings.first_time]);
 
   const fetchAndSet = useCallback(
     (city: string, tempUnit: TempUnit, windUnit: WindUnit) => {
@@ -244,7 +254,6 @@ export default function YarikWeatherApp() {
         {showDownloads && (
           <DownloadModal
             lang={lang}
-            theme={resolvedTheme}
             onClose={() => setShowDownloads(false)}
             isTauri={runningInTauri}
           />

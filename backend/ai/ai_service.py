@@ -183,12 +183,12 @@ def comfort(temp, wind, uv, prob, is_rain):
 def walk(temp, wind, uv, prob, is_rain):
     prob_fraction = prob / 100.0
     s = (
-        8.0
+        10.0
         - abs(temp - 18.0) * 0.2
-        - wind * 0.25
-        - prob_fraction * 2.5
-        - (3.0 if is_rain else 0.0)
-        - (2.0 if uv > 8 else 0.0)
+        - wind * 0.2
+        - prob_fraction * 2.0
+        - (2.0 if is_rain else 0.0)
+        - (1.5 if uv > 8 else 0.0)
     )
     return round(max(0.0, min(10.0, s)), 1)
 

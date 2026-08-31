@@ -13,16 +13,6 @@ echo ">>> Deploying backends..."
 ./build-and-deploy-backend.sh
 echo ""
 
-# ---- MacOS Desktop ----
-echo ">>> Building MacOS..."
-./build-and-deploy-macos.sh
-echo ""
-
-# ---- Windows Desktop ----
-echo ">>> Building Windows..."
-./build-and-deploy-windows.sh
-echo ""
-
 # ---- Android Mobile ----
 echo ">>> Building Android..."
 ./build-and-deploy-android.sh

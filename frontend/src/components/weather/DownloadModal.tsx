@@ -1,14 +1,10 @@
 'use client';
 
-import { useState } from 'react';
-import { Language, Theme } from '@/lib/settings';
+import { Language } from '@/lib/settings';
 import { assetUrl } from '@/lib/assets';
-
-type DownloadOs = 'android' | 'windows' | 'macos' | 'linux';
 
 interface DownloadModalProps {
   lang: Language;
-  theme: Theme;
   onClose: () => void;
   isTauri?: boolean;
 }
@@ -17,87 +13,27 @@ interface DownloadModalProps {
 const RELEASE_BASE =
   'https://github.com/Larfi44/yarik-weather/releases/latest/download';
 
-function downloadLabel(os: DownloadOs): string {
-  const labels: Record<DownloadOs, string> = {
-    android: 'Android',
-    windows: 'Windows',
-    macos: 'MacOS',
-    linux: 'Linux',
-  };
-  return labels[os];
-}
-
-function downloadDescription(os: DownloadOs, lang: Language): string {
-  if (lang === Language.English) {
-    const map: Record<DownloadOs, string> = {
-      android: '.apk for Android',
-      windows: '.exe for Windows',
-      macos: '.dmg for Mac',
-      linux: 'from source',
-    };
-    return map[os];
-  }
-  const map: Record<DownloadOs, string> = {
-    android: '.apk для Android',
-    windows: '.exe для Windows',
-    macos: '.dmg для Mac',
-    linux: 'из исходников',
-  };
-  return map[os];
-}
-
-function downloadUrl(os: DownloadOs): string {
-  const map: Record<DownloadOs, string> = {
-    android: `${RELEASE_BASE}/YarikWeather-Android.apk`,
-    windows: `${RELEASE_BASE}/YarikWeather-Windows.exe`,
-    macos: `${RELEASE_BASE}/YarikWeather-MacOS.dmg`,
-    linux: '',
-  };
-  return map[os];
-}
-
-function getIcon(os: DownloadOs, theme: Theme): string {
-  switch (os) {
-    case 'android':
-      return '/android.png';
-    case 'windows':
-      return '/windows.svg';
-    case 'macos':
-      return theme === Theme.Light ? '/apple-dark.svg' : '/apple-light.svg';
-    case 'linux':
-      return '/linux.png';
-  }
-}
+const ANDROID_URL = `${RELEASE_BASE}/YarikWeather-Android.apk`;
 
 export default function DownloadModal({
   lang,
-  theme,
   onClose,
   isTauri,
 }: DownloadModalProps) {
-  const [selected, setSelected] = useState<DownloadOs>('android');
-  const oss: DownloadOs[] = ['android', 'windows', 'macos', 'linux'];
-
   const handleDownload = async (e: React.MouseEvent<HTMLAnchorElement>) => {
     e.preventDefault();
-    const url = downloadUrl(selected);
     if (isTauri) {
       try {
         const { openUrl } = await import('@tauri-apps/plugin-opener');
-        await openUrl(url);
+        await openUrl(ANDROID_URL);
       } catch (err) {
         console.error('Failed to open URL:', err);
-        window.open(url, '_blank', 'noopener,noreferrer');
+        window.open(ANDROID_URL, '_blank', 'noopener,noreferrer');
       }
     } else {
-      window.open(url, '_blank', 'noopener,noreferrer');
+      window.open(ANDROID_URL, '_blank', 'noopener,noreferrer');
     }
   };
-
-  const installRustCommand =
-    "curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh";
-  const installAppCommand =
-    'cargo install --git https://github.com/Larfi44/yarik-weather --features desktop';
 
   return (
     <div className="modal-overlay">
@@ -115,93 +51,37 @@ export default function DownloadModal({
         </div>
         <p className="modal-subtitle">
           {lang === Language.English
-            ? 'Choose your platform and download the app.'
-            : 'Выберите платформу и скачайте приложение.'}
+            ? 'Download the app for Android.'
+            : 'Скачайте приложение для Android.'}
         </p>
 
         <div className="download-scroll">
           <div className="download-grid">
-            {oss.map((os) => (
-              <div
-                key={os}
-                className={`download-card${selected === os ? ' active' : ''}`}
-                onClick={() => setSelected(os)}
-              >
-                <img
-                  className="download-card-icon"
-                  src={assetUrl(getIcon(os, theme))}
-                  alt={downloadLabel(os)}
-                />
-                <div className="download-card-title">{downloadLabel(os)}</div>
-                <div className="download-card-desc">
-                  {downloadDescription(os, lang)}
-                </div>
-              </div>
-            ))}
-          </div>
-
-          {selected === 'linux' && (
-            <div className="linux-instructions">
-              <div className="linux-step">
-                <p className="linux-step-text">
-                  {lang === Language.English
-                    ? '1. Install Rust'
-                    : '1. Установите Rust'}
-                </p>
-                <code>{installRustCommand}</code>
-              </div>
-              <div className="linux-step">
-                <p className="linux-step-text">
-                  {lang === Language.English
-                    ? '2. Install Yarik Weather'
-                    : '2. Установите Yarik Weather'}
-                </p>
-                <code>{installAppCommand}</code>
+            <div className="download-card active">
+              <img
+                className="download-card-icon"
+                src={assetUrl('/android.png')}
+                alt="Android"
+              />
+              <div className="download-card-title">Android</div>
+              <div className="download-card-desc">
+                {lang === Language.English
+                  ? '.apk for Android'
+                  : '.apk для Android'}
               </div>
             </div>
-          )}
+          </div>
         </div>
 
         <div className="download-actions">
-          {selected !== 'linux' && (
-            <a
-              className="primary-btn download-confirm-btn"
-              href={downloadUrl(selected)}
-              onClick={handleDownload}
-              style={{ textDecoration: 'none', display: 'inline-block' }}
-            >
-              {lang === Language.English ? 'Download' : 'Скачать'}
-            </a>
-          )}
-          {selected === 'macos' && (
-            <div className="mac-instructions">
-              <p className="mac-instructions-title">
-                {lang === Language.English
-                  ? 'After downloading:'
-                  : 'После загрузки:'}
-              </p>
-              <p className="mac-instructions-step">
-                {lang === Language.English
-                  ? '1. Open the .dmg, drag the app to Applications'
-                  : '1. Откройте .dmg, перетащите приложение в Applications'}
-              </p>
-              <p className="mac-instructions-step">
-                {lang === Language.English
-                  ? '2. Open Terminal, type: xattr -cr'
-                  : '2. Откройте Терминал, введите: xattr -cr'}
-              </p>
-              <p className="mac-instructions-step">
-                {lang === Language.English
-                  ? '3. Drag the app into Terminal, press Enter'
-                  : '3. Перетащите приложение в Терминал, нажмите Enter'}
-              </p>
-              <p className="mac-instructions-step">
-                {lang === Language.English
-                  ? '4. Now you can use it'
-                  : '4. Теперь можно пользоваться'}
-              </p>
-            </div>
-          )}
+          <a
+            className="primary-btn download-confirm-btn"
+            href={ANDROID_URL}
+            onClick={handleDownload}
+            style={{ textDecoration: 'none', display: 'inline-block' }}
+          >
+            {lang === Language.English ? 'Download' : 'Скачать'}
+          </a>
         </div>
       </div>
     </div>

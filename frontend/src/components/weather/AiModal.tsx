@@ -48,12 +48,12 @@ function walkScore(
 ): number {
   const probFraction = prob / 100;
   const s =
-    8 -
+    10 -
     Math.abs(temp - 18) * 0.2 -
-    wind * 0.25 -
-    probFraction * 2.5 -
-    (isRain ? 3 : 0) -
-    (uv > 8 ? 2 : 0);
+    wind * 0.2 -
+    probFraction * 2 -
+    (isRain ? 2 : 0) -
+    (uv > 8 ? 1.5 : 0);
   return Math.round(Math.max(0, Math.min(10, s)) * 10) / 10;
 }
 
@@ -368,23 +368,38 @@ export default function AiModal({
             max_uv: Math.min(12, Math.round(maxUv * 10) / 10),
           });
         } else {
-          // Fallback: use seasonal estimation (like ai_service.py's climate data)
-          const isSummer = [5, 6, 7, 8].includes(targetMonth);
-          const seasonTempOffset = isSummer ? 5 : -3;
-          const seasonRainFactor = [4, 5, 6, 7, 8, 9, 10].includes(targetMonth)
-            ? 1.5
-            : 0.5;
-          const seasonUvFactor = [6, 7, 8].includes(targetMonth) ? 1.4 : 0.5;
+          // Fallback: smooth seasonal climate model when no forecast data
+          // exists for that month yet. July is the warmest month in the
+          // northern hemisphere (January in the south), and UV follows the
+          // same seasonal curve; rain peaks in the transition months.
+          const lat = weather.current.latitude ?? 0;
+          const peakMonth = lat < 0 ? 1 : 7; // hemisphere-aware warmest month
+          // 1.0 in the warmest month, -1.0 half a year later
+          const seasonal = Math.cos(
+            ((targetMonth - peakMonth) / 12) * 2 * Math.PI,
+          );
+
+          const avgTemp =
+            Math.round((weekAvgTemp + seasonal * 8) * 10) / 10;
+          const maxUv = Math.min(
+            12,
+            Math.max(
+              1,
+              Math.round(
+                weekMaxUv * (0.35 + 0.65 * ((seasonal + 1) / 2)) * 10,
+              ) / 10,
+            ),
+          );
+          // Wetter in spring/autumn, drier at the temperature extremes
+          const rainFactor = 0.6 + 0.9 * (1 - Math.abs(seasonal));
+          const totalRain =
+            Math.round(Math.max(0, weekTotalRain * 3 * rainFactor) * 10) / 10;
 
           mockPredictData.next_months.push({
             month: targetMonth,
-            avg_temp: Math.round((weekAvgTemp + seasonTempOffset) * 10) / 10,
-            total_rain:
-              Math.round(weekTotalRain * seasonRainFactor * 3 * 10) / 10,
-            max_uv: Math.min(
-              12,
-              Math.round(weekMaxUv * seasonUvFactor * 10) / 10,
-            ),
+            avg_temp: avgTemp,
+            total_rain: totalRain,
+            max_uv: maxUv,
           });
         }
       }
@@ -412,9 +427,6 @@ export default function AiModal({
 
   // Extract recommendations from todayData
   const recommendations: string[] = [];
-  let comfortScoreVal = 0;
-  let walkScoreVal = 0;
-  let swimScoreVal = 0;
   if (todayData) {
     if (Array.isArray(todayData.recommendations)) {
       recommendations.push(...todayData.recommendations);
@@ -422,9 +434,6 @@ export default function AiModal({
     if (todayData.summary && typeof todayData.summary === 'string') {
       recommendations.push(todayData.summary);
     }
-    comfortScoreVal = todayData.comfortScore;
-    walkScoreVal = todayData.walkScore;
-    swimScoreVal = todayData.swimScore;
   }
 
   const monthNames =
@@ -566,36 +575,6 @@ export default function AiModal({
                 {JSON.stringify(todayData, null, 2)}
               </p>
             )}
-
-            <div
-              style={{
-                display: 'flex',
-                gap: '0.5rem',
-                marginTop: '0.75rem',
-                flexWrap: 'wrap',
-              }}
-            >
-              <div className="detail-item" style={{ fontSize: '0.85rem' }}>
-                <span>⭐</span>
-                <span>
-                  {t('Comfort', 'Комфорт')}: {comfortScoreVal}/10
-                </span>
-              </div>
-              <div className="detail-item" style={{ fontSize: '0.85rem' }}>
-                <span>🚶</span>
-                <span>
-                  {t('Walk', 'Прогулка')}: {walkScoreVal}/10
-                </span>
-              </div>
-              {swimScoreVal > 0 && (
-                <div className="detail-item" style={{ fontSize: '0.85rem' }}>
-                  <span>🏊</span>
-                  <span>
-                    {t('Swim', 'Купание')}: {swimScoreVal}/10
-                  </span>
-                </div>
-              )}
-            </div>
 
             {predictData && (
               <div style={{ marginTop: '1rem' }}>

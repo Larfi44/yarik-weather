@@ -1,9 +1,10 @@
 import type { NextConfig } from 'next';
 
-const repo = process.env.GITHUB_REPOSITORY?.split('/')[1] || 'yarik-weather';
-// Only use sub-path prefix when building for GitHub Pages
-const isPages = process.env.GITHUB_PAGES === 'true';
-const prefix = isPages ? `/${repo}` : '';
+// Build for GitVerse Pages with GITVERSE_PAGES=true (see package.json scripts).
+// GitVerse Pages requires all styles/scripts to use RELATIVE paths (./...),
+// so we use a relative asset prefix instead of a basePath — the exported site
+// then works from any sub-path, e.g. https://<owner>.gitverse.site/yarik-weather
+const isGitVerse = process.env.GITVERSE_PAGES === 'true';
 
 const nextConfig: NextConfig = {
   output: 'export',
@@ -11,8 +12,7 @@ const nextConfig: NextConfig = {
     resolveExtensions: ['.tsx', '.ts', '.jsx', '.js', '.json'],
     root: __dirname,
   },
-  basePath: prefix,
-  assetPrefix: isPages ? `/${repo}/` : '',
+  assetPrefix: isGitVerse ? './' : '',
   images: {
     unoptimized: true,
   },
