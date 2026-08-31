@@ -1,0 +1,10 @@
+# Jekyll: force-include Next.js underscore-prefixed assets
+# (GitVerse Pages uses a Jekyll-based auto-build which hides these by default)
+include:
+  - "_next"
+  - "_not-found"
+  - "__next.__PAGE__.txt"
+  - "__next._full.txt"
+  - "__next._head.txt"
+  - "__next._index.txt"
+  - "__next._tree.txt"
