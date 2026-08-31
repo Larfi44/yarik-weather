@@ -23,9 +23,11 @@ cp out/index.html dist-android/ 2>/dev/null || cp .next/server/app/index.html di
 
 echo "  Web assets prepared in dist-android/"
 
-# Remove node_modules to prevent it from being bundled into APK (saves ~500MB+)
-echo "Removing node_modules to reduce APK size..."
-rm -rf node_modules
+# NOTE: node_modules is intentionally NOT removed here anymore.
+# It is not part of frontendDist (dist-android), so it never ends up in the APK,
+# and deleting it broke `npm run dev` afterwards ("next: command not found").
+# If you want to reclaim disk space after a build, remove it manually:
+#   cd frontend && rm -rf node_modules
 
 # ---- Launcher icon ----
 echo "Generating icons..."
@@ -71,18 +73,18 @@ fi
   --ks-pass pass:android \
   --ks-key-alias androiddebugkey \
   --key-pass pass:android \
-  --out YarikWeather-Android.apk \
+  --out yarik-weather.apk \
   "$APK_PATH"
 
 # ---- Copy to downloads ----
 mkdir -p frontend/public/downloads
-cp YarikWeather-Android.apk frontend/public/downloads/
+cp yarik-weather.apk frontend/public/downloads/
 
 # ---- Clean up the root copy ----
-rm -f YarikWeather-Android.apk
+rm -f yarik-weather.apk
 
 echo ""
 echo "========================================="
 echo "  ✅ Android .apk ready!"
-echo "  frontend/public/downloads/YarikWeather-Android.apk"
+echo "  frontend/public/downloads/yarik-weather.apk"
 echo "========================================="

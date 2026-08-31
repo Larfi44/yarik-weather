@@ -74,6 +74,32 @@ function swimScore(
   return Math.round(Math.max(0, Math.min(10, s)) * 10) / 10;
 }
 
+/** Translate common Open-Meteo condition strings to Russian (for the AI summary). */
+function translateCondition(cond: string, lang: string): string {
+  if (lang !== 'ru') return cond;
+  const map: Record<string, string> = {
+    clear: 'ясно',
+    sunny: 'солнечно',
+    'partly cloudy': 'переменная облачность',
+    cloudy: 'облачно',
+    overcast: 'пасмурно',
+    fog: 'туман',
+    drizzle: 'морось',
+    'light drizzle': 'лёгкая морось',
+    rain: 'дождь',
+    'light rain': 'небольшой дождь',
+    'moderate rain': 'умеренный дождь',
+    'heavy rain': 'сильный дождь',
+    showers: 'ливень',
+    snow: 'снег',
+    'light snow': 'небольшой снег',
+    'heavy snow': 'сильный снег',
+    sleet: 'мокрый снег',
+    thunderstorm: 'гроза',
+  };
+  return map[cond.toLowerCase()] ?? cond;
+}
+
 export default function AiModal({
   open,
   onClose,
@@ -325,7 +351,7 @@ export default function AiModal({
         next_months: [],
         summary: t(
           `Next week in ${weather.city}: Avg ${Math.round(weekAvgTemp * 10) / 10}°C, ${Math.round(weekTotalRain * 10) / 10}mm rain, max UV ${Math.round(weekMaxUv * 10) / 10}.`,
-          `На следующей неделе в ${weather.city}: средн. ${Math.round(weekAvgTemp * 10) / 10}°C, ${Math.round(weekTotalRain * 10) / 10}мм дождя, макс УФ ${Math.round(weekMaxUv * 10) / 10}.`,
+          `На следующей неделе в ${weather.city}: Средняя температура ${Math.round(weekAvgTemp * 10) / 10}°C, ${Math.round(weekTotalRain * 10) / 10}мм дождя, макс. Ультрафиолет ${Math.round(weekMaxUv * 10) / 10}.`,
         ),
       };
 
@@ -379,8 +405,7 @@ export default function AiModal({
             ((targetMonth - peakMonth) / 12) * 2 * Math.PI,
           );
 
-          const avgTemp =
-            Math.round((weekAvgTemp + seasonal * 8) * 10) / 10;
+          const avgTemp = Math.round((weekAvgTemp + seasonal * 8) * 10) / 10;
           const maxUv = Math.min(
             12,
             Math.max(
@@ -406,7 +431,10 @@ export default function AiModal({
 
       setTodayData({
         recommendations: tips,
-        summary: `Current conditions in ${weather.city}: ${current.temperature}°C, ${current.condition.toLowerCase()}. ${current.precipitation_probability}% chance of precipitation.`,
+        summary: t(
+          `Current conditions in ${weather.city}: ${current.temperature}°C, ${current.condition.toLowerCase()}. ${current.precipitation_probability}% chance of precipitation.`,
+          `Текущие условия в городе ${weather.city}: ${current.temperature}°C, ${translateCondition(current.condition, language)}. Вероятность осадков ${current.precipitation_probability}%.`,
+        ),
         comfortScore: cScore,
         walkScore: wScore,
         swimScore: sScore,
@@ -616,7 +644,7 @@ export default function AiModal({
                       }}
                     >
                       <div style={{ fontSize: '0.85rem' }}>
-                        🌡️ {t('Avg', 'Средн.')}:{' '}
+                        🌡️ {t('Avg', 'Средняя температура')}:{' '}
                         {predictData.next_week.avg_temp}°
                       </div>
                       <div style={{ fontSize: '0.85rem' }}>
@@ -624,7 +652,7 @@ export default function AiModal({
                         {predictData.next_week.total_rain}mm
                       </div>
                       <div style={{ fontSize: '0.85rem' }}>
-                        ☀️ {t('Max UV', 'Макс УФ')}:{' '}
+                        ☀️ {t('Max UV', 'Макс. Ультрафиолет')}:{' '}
                         {predictData.next_week.max_uv}
                       </div>
                     </div>
@@ -673,13 +701,14 @@ export default function AiModal({
                             }}
                           >
                             <div style={{ fontSize: '0.85rem' }}>
-                              🌡️ {t('Avg', 'Средн.')}: {m.avg_temp}°
+                              🌡️ {t('Avg', 'Средняя температура')}: {m.avg_temp}
+                              °
                             </div>
                             <div style={{ fontSize: '0.85rem' }}>
                               🌧️ {t('Rain', 'Дождь')}: {m.total_rain}mm
                             </div>
                             <div style={{ fontSize: '0.85rem' }}>
-                              ☀️ {t('Max UV', 'Макс УФ')}: {m.max_uv}
+                              ☀️ {t('Max UV', 'Макс. Ультрафиолет')}: {m.max_uv}
                             </div>
                           </div>
                         </div>

@@ -81,7 +81,6 @@ export default function SettingsModal({
 
   const isDark = theme === Theme.Dark;
   const textColor = isDark ? '#e5e7eb' : '#1a1a1a';
-  const linkColor = '#4a9eff';
 
   return (
     <div className="modal-overlay">
@@ -265,17 +264,17 @@ export default function SettingsModal({
             {lang === Language.English ? 'Developed by ' : 'Разработано '}
           </span>
           <a
-            href="https://larfi44.github.io/yarik-studio/index.html"
+            href="https://larfi.gitverse.site/yarik-studio/index.html"
             target="_blank"
             rel="noopener noreferrer"
             onClick={(e) =>
               handleExternalLink(
                 e,
-                'https://larfi44.github.io/yarik-studio/index.html',
+                'https://larfi.gitverse.site/yarik-studio/index.html',
               )
             }
             style={{
-              color: linkColor,
+              color: '#f97316',
               textDecoration: 'none',
               fontWeight: 600,
               cursor: 'pointer',
@@ -283,6 +282,40 @@ export default function SettingsModal({
             }}
           >
             Yarik Studio
+          </a>
+        </div>
+
+        <div
+          style={{
+            marginTop: '12px',
+            textAlign: 'center',
+            fontSize: '0.85rem',
+          }}
+        >
+          <a
+            href="https://larfi.gitverse.site/yarik-studio/pages/support.html"
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={(e) =>
+              handleExternalLink(
+                e,
+                'https://larfi.gitverse.site/yarik-studio/pages/support.html',
+              )
+            }
+            style={{
+              display: 'inline-block',
+              backgroundColor: '#ef4444',
+              color: '#fff',
+              textDecoration: 'none',
+              cursor: 'pointer',
+              fontSize: '0.85rem',
+              padding: '10px 20px',
+              borderRadius: '8px',
+              fontWeight: 600,
+            }}
+          >
+            🛠️{' '}
+            {lang === Language.English ? 'Technical support' : 'Техподдержка'}
           </a>
         </div>
 

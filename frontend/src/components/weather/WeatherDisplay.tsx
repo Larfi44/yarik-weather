@@ -385,7 +385,7 @@ export default function WeatherDisplay({
             {Math.round(data.current.precipitation_probability)}%
           </p>
           <p>
-            ☀️ {lang === Language.English ? 'UV Index' : 'УФ-индекс'}:{' '}
+            ☀️ {lang === Language.English ? 'UV Index' : 'Ультрафиолет'}:{' '}
             {(data.current.uv_index ?? 0).toFixed(1)} (
             {translateCategory(uvCategory(data.current.uv_index ?? 0), lang)})
           </p>

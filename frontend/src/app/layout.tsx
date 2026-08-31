@@ -31,15 +31,21 @@ export default function RootLayout({
                 if (href.startsWith('http://') || href.startsWith('https://')) {
                   e.preventDefault();
                   e.stopPropagation();
-                  // Try Tauri opener plugin if available
+                  // Open in the system browser via the Tauri opener plugin.
+                  // Note: a raw import('@tauri-apps/plugin-opener') does NOT work
+                  // here — this string is injected at runtime and is never seen
+                  // by the bundler, so the bare specifier fails to resolve and
+                  // the app would fall back to in-app navigation on Android.
+                  // Calling the underlying IPC command directly works everywhere.
                   if (window.__TAURI_INTERNALS__) {
                     try {
-                      import('@tauri-apps/plugin-opener').then(function(mod) {
-                        mod.openUrl(href);
-                      }).catch(function() {
-                        window.open(href, '_blank', 'noopener,noreferrer');
-                      });
-                    } catch(err) {
+                      window.__TAURI_INTERNALS__
+                        .invoke('plugin:opener|open_url', { url: href })
+                        .catch(function (err) {
+                          console.error('Failed to open URL:', err);
+                          window.open(href, '_blank', 'noopener,noreferrer');
+                        });
+                    } catch (err) {
                       window.open(href, '_blank', 'noopener,noreferrer');
                     }
                   } else {
