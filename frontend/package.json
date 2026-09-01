@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "NODE_ENV=production bun .next/standalone/server.js 2>&1 | tee server.log",
     "lint": "eslint .",
-    "build:pages": "GITVERSE_PAGES=true next build && rm -rf ../out && cp -R out ../out && touch ../out/.nojekyll",
+    "build:pages": "NEXT_PUBLIC_GITVERSE_PAGES=true next build && rm -rf ../out && cp -R out ../out && touch ../out/.nojekyll",
     "db:push": "prisma db push",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
