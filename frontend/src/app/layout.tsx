@@ -5,7 +5,7 @@ export const metadata: Metadata = {
   title: 'Yarik Weather',
   description: 'Weather app with AI recommendations',
   icons: {
-    icon: '/favicon.svg',
+    icon: 'favicon.svg',
   },
 };
 

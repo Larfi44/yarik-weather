@@ -1,11 +1,12 @@
 /**
  * Returns the correct path for static assets when deployed
- * under a sub-path (e.g. GitHub Pages /yarik-weather/).
+ * under a sub-path (e.g. GitVerse Pages /yarik-weather/).
  *
  * Uses a compile-time constant so server/client render identically.
- * Only applies the prefix when building for GitHub Pages.
+ * For GitVerse Pages we emit RELATIVE paths (./...) — this matches the
+ * relative `assetPrefix` in next.config.ts and works from any sub-path.
  */
-const PREFIX = process.env.GITHUB_PAGES === 'true' ? '/yarik-weather' : '';
+const PREFIX = process.env.GITVERSE_PAGES === 'true' ? './' : '';
 
 export function assetUrl(path: string): string {
   return PREFIX + path;
