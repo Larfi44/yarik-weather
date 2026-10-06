@@ -105,12 +105,32 @@ window.YW = window.YW || {};
 
   const MONTH_NAMES = {
     ru: [
-      'Янв', 'Фев', 'Мар', 'Апр', 'Май', 'Июн',
-      'Июл', 'Авг', 'Сен', 'Окт', 'Ноя', 'Дек',
+      'Янв',
+      'Фев',
+      'Мар',
+      'Апр',
+      'Май',
+      'Июн',
+      'Июл',
+      'Авг',
+      'Сен',
+      'Окт',
+      'Ноя',
+      'Дек',
     ],
     en: [
-      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
     ],
   };
 
@@ -127,7 +147,10 @@ window.YW = window.YW || {};
     const month = now.getMonth() + 1; // 1-indexed, matching ai_service.py
 
     const cond = String(current.condition || '').toLowerCase();
-    const isRain = rainFlag(current.condition, current.precipitation_probability);
+    const isRain = rainFlag(
+      current.condition,
+      current.precipitation_probability,
+    );
     const coastal = YW.isCoastal(weather.city);
 
     // ── Scores matching ai_service.py exactly ──
@@ -155,8 +178,12 @@ window.YW = window.YW || {};
 
     // ── Recommendations (scores first, so they top the list) ──
     const tips = [];
-    tips.push(t('⭐ Comfort: ' + cScore + '/10', '⭐ Комфорт: ' + cScore + '/10'));
-    tips.push(t('🚶 Walk: ' + wScore + '/10', '🚶 Прогулка: ' + wScore + '/10'));
+    tips.push(
+      t('⭐ Comfort: ' + cScore + '/10', '⭐ Комфорт: ' + cScore + '/10'),
+    );
+    tips.push(
+      t('🚶 Walk: ' + wScore + '/10', '🚶 Прогулка: ' + wScore + '/10'),
+    );
 
     if (cond.indexOf('rain') !== -1 || cond.indexOf('drizzle') !== -1) {
       if (cond.indexOf('heavy') !== -1 || cond.indexOf('violent') !== -1) {
@@ -190,7 +217,10 @@ window.YW = window.YW || {};
       );
     } else if (current.temperature < 10) {
       tips.push(
-        t('🧥 Cold – warm jacket and scarf.', 'Холодно – 🧥 тёплая куртка и шарф.'),
+        t(
+          '🧥 Cold – warm jacket and scarf.',
+          'Холодно – 🧥 тёплая куртка и шарф.',
+        ),
       );
     } else if (current.temperature < 18) {
       tips.push(
@@ -201,7 +231,10 @@ window.YW = window.YW || {};
       );
     } else if (current.temperature < 26) {
       tips.push(
-        t('👕 Comfortable – t-shirt is fine.', 'Комфортно – 👕 можно в футболке.'),
+        t(
+          '👕 Comfortable – t-shirt is fine.',
+          'Комфортно – 👕 можно в футболке.',
+        ),
       );
     } else {
       tips.push(
@@ -226,13 +259,24 @@ window.YW = window.YW || {};
       if (current.sea_temperature != null && current.sea_temperature > 17) {
         tips.push(
           t(
-            '🏊 Swim: ' + sScore + '/10 (water ' + current.sea_temperature.toFixed(0) + '°C)',
-            '🏊 Купание: ' + sScore + '/10 (вода ' + current.sea_temperature.toFixed(0) + '°C)',
+            '🏊 Swim: ' +
+              sScore +
+              '/10 (water ' +
+              current.sea_temperature.toFixed(0) +
+              '°C)',
+            '🏊 Купание: ' +
+              sScore +
+              '/10 (вода ' +
+              current.sea_temperature.toFixed(0) +
+              '°C)',
           ),
         );
       } else {
         tips.push(
-          t('🏖️ Sea too cold for swimming.', '🏖️ Море слишком холодное для купания.'),
+          t(
+            '🏖️ Sea too cold for swimming.',
+            '🏖️ Море слишком холодное для купания.',
+          ),
         );
       }
     }
@@ -338,8 +382,16 @@ window.YW = window.YW || {};
     // The outlook sentence only mentions the metrics the data supports.
     const weekParts = [
       t(
-        'Next week in ' + weather.city + ': Avg ' + Math.round(weekAvgTemp * 10) / 10 + '°C',
-        'На следующей неделе в ' + weather.city + ': Средняя температура ' + Math.round(weekAvgTemp * 10) / 10 + '°C',
+        'Next week in ' +
+          weather.city +
+          ': Avg ' +
+          Math.round(weekAvgTemp * 10) / 10 +
+          '°C',
+        'На следующей неделе в ' +
+          weather.city +
+          ': Средняя температура ' +
+          Math.round(weekAvgTemp * 10) / 10 +
+          '°C',
       ),
     ];
     if (hasRainData) {
@@ -381,7 +433,9 @@ window.YW = window.YW || {};
       forecastByMonth[m].temps.push(
         (day.temperature_max + day.temperature_min) / 2,
       );
-      forecastByMonth[m].rains.push(num(day.precipitation_probability_max) * 0.1);
+      forecastByMonth[m].rains.push(
+        num(day.precipitation_probability_max) * 0.1,
+      );
       forecastByMonth[m].uvs.push(num(day.uv_index_max));
     });
 
@@ -410,14 +464,17 @@ window.YW = window.YW || {};
         const lat = current.latitude != null ? current.latitude : 0;
         const peakMonth = lat < 0 ? 1 : 7;
         // 1.0 in the warmest month, -1.0 half a year later
-        const seasonal = Math.cos(((targetMonth - peakMonth) / 12) * 2 * Math.PI);
+        const seasonal = Math.cos(
+          ((targetMonth - peakMonth) / 12) * 2 * Math.PI,
+        );
 
         const avgTemp = Math.round((weekAvgTemp + seasonal * 8) * 10) / 10;
         const maxUv = Math.min(
           12,
           Math.max(
             1,
-            Math.round(weekMaxUv * (0.35 + 0.65 * ((seasonal + 1) / 2)) * 10) / 10,
+            Math.round(weekMaxUv * (0.35 + 0.65 * ((seasonal + 1) / 2)) * 10) /
+              10,
           ),
         );
         // Wetter in spring/autumn, drier at the temperature extremes
@@ -438,10 +495,18 @@ window.YW = window.YW || {};
       recommendations: tips,
       summary:
         t(
-          'Current conditions in ' + weather.city + ': ' + num(current.temperature) +
-            '°C, ' + cond,
-          'Текущие условия в городе ' + weather.city + ': ' + num(current.temperature) +
-            '°C, ' + translateCondition(current.condition, language),
+          'Current conditions in ' +
+            weather.city +
+            ': ' +
+            num(current.temperature) +
+            '°C, ' +
+            cond,
+          'Текущие условия в городе ' +
+            weather.city +
+            ': ' +
+            num(current.temperature) +
+            '°C, ' +
+            translateCondition(current.condition, language),
         ) +
         (current.precipitation_probability != null
           ? t(
@@ -504,7 +569,7 @@ window.YW = window.YW || {};
     const brand = h('div', { class: 'ai-modal-title' }, [
       h('img', {
         class: 'ai-logo-icon',
-        src: YW.assetUrl('/yaroslav_ai.svg'),
+        src: YW.assetUrl('src/assets/yaroslav-ai.svg'),
         alt: 'AI',
       }),
       h('span', { style: { color: aiColor } }, ['Yaroslav AI']),
@@ -523,7 +588,10 @@ window.YW = window.YW || {};
     );
 
     const body = h('div', {});
-    mount(modal, [h('div', { class: 'ai-modal-header' }, [brand, closeBtn]), body]);
+    mount(modal, [
+      h('div', { class: 'ai-modal-header' }, [brand, closeBtn]),
+      body,
+    ]);
 
     let data = null;
     let errorText = '';
@@ -620,7 +688,13 @@ window.YW = window.YW || {};
       const children = [
         h(
           'h3',
-          { style: { fontWeight: 600, marginBottom: '0.5rem', fontSize: '0.95rem' } },
+          {
+            style: {
+              fontWeight: 600,
+              marginBottom: '0.5rem',
+              fontSize: '0.95rem',
+            },
+          },
           ['💡 ' + t('Recommendations', 'Рекомендации')],
         ),
       ];
@@ -635,11 +709,9 @@ window.YW = window.YW || {};
         );
       } else {
         children.push(
-          h(
-            'p',
-            { style: { color: 'var(--yw-muted)', fontSize: '0.85rem' } },
-            [JSON.stringify(data, null, 2)],
-          ),
+          h('p', { style: { color: 'var(--yw-muted)', fontSize: '0.85rem' } }, [
+            JSON.stringify(data, null, 2),
+          ]),
         );
       }
 
@@ -683,11 +755,17 @@ window.YW = window.YW || {};
         ];
         // Rain and UV are optional: api-ninjas does not publish them.
         if (week.total_rain != null) {
-          weekRows.push(statRow('🌧️', t('Rain', 'Дождь'), week.total_rain + 'mm'));
+          weekRows.push(
+            statRow('🌧️', t('Rain', 'Дождь'), week.total_rain + 'mm'),
+          );
         }
         if (week.max_uv != null) {
           weekRows.push(
-            statRow('☀️', t('Max UV', 'Макс. Ультрафиолет'), String(week.max_uv)),
+            statRow(
+              '☀️',
+              t('Max UV', 'Макс. Ультрафиолет'),
+              String(week.max_uv),
+            ),
           );
         }
 
@@ -719,11 +797,17 @@ window.YW = window.YW || {};
             statRow('🌡️', t('Avg', 'Средняя температура'), m.avg_temp + '°'),
           ];
           if (m.total_rain != null) {
-            monthRows.push(statRow('🌧️', t('Rain', 'Дождь'), m.total_rain + 'mm'));
+            monthRows.push(
+              statRow('🌧️', t('Rain', 'Дождь'), m.total_rain + 'mm'),
+            );
           }
           if (m.max_uv != null) {
             monthRows.push(
-              statRow('☀️', t('Max UV', 'Макс. Ультрафиолет'), String(m.max_uv)),
+              statRow(
+                '☀️',
+                t('Max UV', 'Макс. Ультрафиолет'),
+                String(m.max_uv),
+              ),
             );
           }
 

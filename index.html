@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
   <head>
     <meta charset="utf-8" />
@@ -8,8 +8,8 @@
     <!-- Weather data comes straight from api-ninjas (see js/api.js). The API
          key can be overridden per load with ?key=<key> or window.YW_API_KEY,
          or at runtime with YW.api.setApiKey('<key>'). -->
-    <link rel="icon" href="./favicon.svg" />
-    <link rel="stylesheet" href="./main.css" />
+    <link rel="icon" href="src/assets/favicon.svg" />
+    <link rel="stylesheet" href="src/main.css" />
   </head>
   <body>
     <!-- Static app shell. All dynamic parts (weather, status cards, modals)
@@ -19,7 +19,7 @@
         <div class="header glass-card">
           <div class="brand">
             <img
-              src="./favicon.svg"
+              src="src/assets/favicon.svg"
               class="header-icon"
               alt="Yarik Weather"
             />
@@ -35,7 +35,9 @@
             >
               AI
             </button>
-            <button class="icon-btn" id="downloads-btn" type="button">📥</button>
+            <button class="icon-btn" id="downloads-btn" type="button">
+              📥
+            </button>
             <button class="icon-btn" id="settings-btn" type="button">⚙️</button>
           </div>
         </div>
@@ -47,7 +49,9 @@
             type="text"
             placeholder="Enter city name..."
           />
-          <button class="search-btn" id="search-btn" type="button">Search</button>
+          <button class="search-btn" id="search-btn" type="button">
+            Search
+          </button>
         </div>
 
         <div id="status-slot"></div>
@@ -56,15 +60,15 @@
       </div>
     </div>
 
-    <script src="./js/settings.js" defer></script>
-    <script src="./js/helpers.js" defer></script>
-    <script src="./js/coastal.js" defer></script>
-    <script src="./js/api.js" defer></script>
-    <script src="./js/tauri.js" defer></script>
-    <script src="./js/dom.js" defer></script>
-    <script src="./js/weather.js" defer></script>
-    <script src="./js/modals.js" defer></script>
-    <script src="./js/ai.js" defer></script>
-    <script src="./js/app.js" defer></script>
+    <script src="src/js/settings.js" defer></script>
+    <script src="src/js/helpers.js" defer></script>
+    <script src="src/js/coastal.js" defer></script>
+    <script src="src/js/api.js" defer></script>
+    <script src="src/js/tauri.js" defer></script>
+    <script src="src/js/dom.js" defer></script>
+    <script src="src/js/weather.js" defer></script>
+    <script src="src/js/modals.js" defer></script>
+    <script src="src/js/ai.js" defer></script>
+    <script src="src/js/app.js" defer></script>
   </body>
 </html>

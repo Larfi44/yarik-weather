@@ -93,7 +93,10 @@ window.YW = window.YW || {};
   function openSettings(options) {
     const opts = options || {};
     const isTauri = !!opts.isTauri;
-    let temp = Object.assign({}, opts.settings || Settings.getDefaultSettings());
+    let temp = Object.assign(
+      {},
+      opts.settings || Settings.getDefaultSettings(),
+    );
     const shell = createModalShell('');
 
     function isDark() {
@@ -561,7 +564,7 @@ window.YW = window.YW || {};
     const androidCard = h('div', { class: 'download-card active' }, [
       h('img', {
         class: 'download-card-icon',
-        src: YW.assetUrl('/android.png'),
+        src: YW.assetUrl('src/assets/android.png'),
         alt: 'Android',
       }),
       h('div', { class: 'download-card-title' }, 'Android'),
