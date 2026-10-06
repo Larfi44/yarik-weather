@@ -19,8 +19,8 @@ cd "$(dirname "$0")/.."
 BRANCH="${1:-pages}"
 REMOTE="${2:-gitverse}"
 
-echo "==> 1/3 Building static site (frontend -> out/)"
-(cd frontend && npm run build:pages)
+echo "==> 1/3 Building static site (frontend/public -> frontend/out)"
+bash frontend/scripts/build.sh
 
 # Stage the built site in a temporary folder
 SITE_DIR=$(mktemp -d)

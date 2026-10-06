@@ -8,14 +8,17 @@ echo "  Yarik Weather - Build & Deploy"
 echo "========================================="
 echo ""
 
-# ---- Backend ----
-echo ">>> Deploying backends..."
-./build-and-deploy-backend.sh
+# ---- Backend (legacy, opt-in) ----
+# The website reads api-ninjas directly from the browser now, and the old
+# Yandex Cloud containers are gone, so this step is skipped by default.
+# Run ./build-and-deploy-backend.sh by hand (after updating the registry
+# details) if you are deploying a self-hosted backend again.
+echo ">>> Backends: skipped (legacy — the site calls api-ninjas in the browser)"
 echo ""
 
 # ---- Android Mobile ----
 echo ">>> Building Android..."
-./build-and-deploy-android.sh
+./build-android.sh
 echo ""
 
 # ---- Final Cleanup ----

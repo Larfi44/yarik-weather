@@ -8,36 +8,16 @@ echo "  Yarik Weather – Android Build"
 echo "========================================="
 
 # ---- Frontend Build ----
-cd frontend
-echo "Installing dependencies..."
-bun install
-echo "Building Next.js frontend for Android..."
-bun run build
+echo "Building static frontend (frontend/public -> frontend/out)..."
+bash frontend/scripts/build.sh
 
-# Clean and prepare dist-android (remove old builds)
-rm -rf dist-android
-mkdir -p dist-android/_next
-cp -r .next/static dist-android/_next/
-rsync -av --exclude='downloads' public/ dist-android/
-cp out/index.html dist-android/ 2>/dev/null || cp .next/server/app/index.html dist-android/index.html
-
-echo "  Web assets prepared in dist-android/"
-
-# NOTE: node_modules is intentionally NOT removed here anymore.
-# It is not part of frontendDist (dist-android), so it never ends up in the APK,
-# and deleting it broke `npm run dev` afterwards ("next: command not found").
-# If you want to reclaim disk space after a build, remove it manually:
-#   cd frontend && rm -rf node_modules
+# No bundler involved: out/ is exactly what Tauri bundles (frontendDist).
+echo "  Web assets prepared in frontend/out/"
 
 # ---- Launcher icon ----
 echo "Generating icons..."
-cd ..
 python3 scripts/generate-icons.py
 echo "  Icons generated with cargo tauri icon"
-
-# ---- Update tauri config for Android ----
-echo "Configuring Tauri for Android..."
-sed -i '' 's|"frontendDist": "../frontend/dist-desktop"|"frontendDist": "../frontend/dist-android"|' src-tauri/tauri.conf.json
 
 # ---- Generate Android project with icons ----
 export TAURI_ANDROID_AGP_VERSION=8.2.0

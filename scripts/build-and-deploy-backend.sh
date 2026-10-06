@@ -1,4 +1,17 @@
 #!/bin/bash
+# ============================================================
+#  LEGACY / OPT-IN — the website does not need this anymore.
+#
+#  The browser gets its weather straight from api-ninjas
+#  (see frontend/README.md), and the Yandex Cloud containers
+#  this script targets no longer exist, so the registry,
+#  service-account and container details below must be
+#  updated before it can work again. It is no longer called
+#  by scripts/build-and-deploy.sh.
+#
+#  Only needed if you deploy the self-hosted Rust backend and
+#  point the client at it with ?api=<url>.
+# ============================================================
 cd "$(dirname "$0")"
 set -e
 set -o pipefail
@@ -71,5 +84,19 @@ for repo in yarik-weather yaroslav-ai-weather; do
         test -n "$id" && (timeout 15 yc container image delete "$id" 2>/dev/null || true)
     done
 done 2>/dev/null || true
+
+# ---- Point the frontend at the freshly deployed container ----
+# A serverless container keeps its id across revisions, and its public URL is
+# https://<container-id>.containers.yandexcloud.net. Print both endpoints so the
+# weather one can be copied into <meta name="yw-api-url"> in
+# frontend/public/index.html (see also frontend/public/js/api.js).
+#
+# NOTE: this script still targets the ids of the (now deleted) cloud folder:
+# registry crp5q6mqrcrcaiah7fgf and service account ajetvd45epqtuua9l6ob. Update
+# them (and create a new folder/registry) before the next deploy.
+for name in yarik-weather yaroslav-ai-weather; do
+  id="$(yc serverless container get --name "$name" --format json 2>/dev/null | jq -r '.id // empty' || true)"
+  test -n "$id" && echo "  $name endpoint: https://$id.containers.yandexcloud.net"
+done
 
 echo "Backend done"

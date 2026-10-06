@@ -15,13 +15,13 @@ backend/Cargo.lock
 backend/model_*.onnx
 backend/vendor/
 
-# Frontend (Next.js)
-frontend/.next/
+# Frontend (plain HTML/CSS/JS — no bundler, build = copy public/ -> out/)
 frontend/out/
-frontend/build/
+out/
 frontend/dist/
-frontend/public/downloads/
 frontend/download/
+frontend/public/downloads/
+frontend/public/keystore.jks
 frontend/public/favicon_hired.png
 
 # Tauri generated files
