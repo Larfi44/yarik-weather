@@ -1,38 +1,57 @@
 /**
- * Weather client — talks to api-ninjas (api-ninjas.com) directly from the
+ * Weather client — talks to Open-Meteo (open-meteo.com) directly from the
  * browser, so no backend is required. The old Rust server in backend/ is kept
  * only as an optional fallback (see "Legacy backend" near the bottom).
  *
- * Every search sends the X-Api-Key header to three endpoints:
+ * Every search makes two key-less requests:
  *
- *   1. GET /v1/geocoding?city=<name>      city -> lat/lon + IANA timezone
- *   2. GET /v1/weather?lat=&lon=          current conditions
- *   3. GET /v1/weatherforecast?lat=&lon=  40 entries = 5 days * 3 hours
+ *   1. GET geocoding-api.open-meteo.com/v1/search?name=<city>
+ *        city -> latitude/longitude + IANA timezone (cached in localStorage)
+ *   2. GET api.open-meteo.com/v1/forecast?latitude=&longitude=&…
+ *        current + hourly (one row per hour) + daily blocks in a single answer
  *
- * and folds the three answers into the same WeatherResponse shape the UI
+ * A network that blackholes the forecast host does not break the app: when
+ * api.open-meteo.com only ever times out (ERR_CONNECTION_TIMED_OUT — some ISPs
+ * drop the node its DNS hands out, while the other Open-Meteo hosts on the same
+ * cluster keep answering), the identical /v1/forecast call is retried once
+ * against the standby gateway historical-forecast-api.open-meteo.com. See
+ * FORECAST_FALLBACK_HOST.
+ *
+ * and, only for coastal cities, one best-effort extra call that must never
+ * break a search:
+ *
+ *   3. GET marine-api.open-meteo.com/v1/marine?…&hourly=sea_surface_temperature
+ *
+ * The answers are folded into the same WeatherResponse shape the UI
  * (weather.js / ai.js) has always consumed:
  *
  *   { city, current, hourly[], yesterday, forecast[], local_today,
  *     local_yesterday }
  *
- * Values api-ninjas does not provide stay `null` and the UI hides their rows
- * instead of printing fake zeros:
+ * Unlike api-ninjas, Open-Meteo publishes every metric this UI renders, so the
+ * rows that used to be hidden are populated for real:
  *
  *   pressure, uv_index, precipitation_probability, sea_temperature,
- *   yesterday (no historical endpoint), uv_index_max on the daily cards,
- *   per-day sunrise/sunset (only day 0 gets them, from the geocoding sun block).
+ *   a genuine `yesterday` (past_days=1), uv_index_max on the daily cards and
+ *   sunrise/sunset on *every* daily card — not just day 0. The `current` block
+ *   has no UV or rain-probability column, so the card borrows those two from
+ *   the hourly row closest to "now".
  *
- * API key resolution order — the first non-empty value wins:
+ * Cyrillic searches are transliterated once ("Сочи" -> "sochi"), because the
+ * geocoder only indexes the Latin spelling.
  *
- *   1. window.YW_API_KEY            injected at runtime (console, Tauri, tests)
- *   2. ?key=<key>                   per-load override, e.g. index.html?key=...
- *   3. <meta name="yw-api-key">     optional tag, if you keep the key in the HTML
- *   4. DEFAULT_API_KEY              the committed key below
+ * No API key is needed on the free tier. The key plumbing is kept anyway
+ * (window.YW_API_KEY / ?key= / <meta name="yw-api-key"> / DEFAULT_API_KEY) and
+ * a key, when present, is sent as Open-Meteo's `apikey` query parameter, i.e.
+ * the paid customer API. It is never sent as a header, so every request stays
+ * CORS-"simple" and no preflight is triggered.
  *
- * Repointing needs no rebuild: run YW.api.setApiKey('...') in the console.
+ * Open-Meteo answers with local-time ISO strings for the city (timezone=auto),
+ * which is exactly what the mappers below want: no timezone arithmetic, no
+ * unix timestamps to convert.
  *
  * NOTE: the temperature/wind unit arguments are kept for API parity with the
- * original call sites — api-ninjas always answers in °C and m/s, so the
+ * original call sites — the request always asks for °C and m/s, so the
  * conversion happens in the UI helpers.
  */
 window.YW = window.YW || {};
@@ -41,29 +60,78 @@ window.YW = window.YW || {};
   'use strict';
 
   /**
-   * Committed api-ninjas key (free tier). It is visible in the page source:
-   * rotate it on api-ninjas.com and paste the new value here, or override it at
-   * runtime via ?key=, window.YW_API_KEY or YW.api.setApiKey().
+   * Open-Meteo's free tier needs no key, so nothing is committed here. A value
+   * only shows up when one is supplied at runtime (?key=, window.YW_API_KEY,
+   * the meta tag or YW.api.setApiKey()); it is then appended as the `apikey`
+   * parameter, which is what Open-Meteo's paid customer API expects.
    */
-  const DEFAULT_API_KEY = '6b9usH0CRcyVa7x0enU53PhyCxj0WVahFkS7yqii';
+  const DEFAULT_API_KEY = '';
 
   /** Global / query parameter / meta tag that can supply an API key. */
   const API_KEY_GLOBAL = 'YW_API_KEY';
   const API_KEY_PARAM = 'key';
   const API_KEY_META = 'yw-api-key';
 
-  /** api-ninjas host; the key travels in a header, never in the URL. */
-  const API_HOST = 'https://api.api-ninjas.com';
+  /** Open-Meteo hosts: forecast, geocoding and (best effort) marine data. */
+  const API_HOST = 'https://api.open-meteo.com';
+  const GEOCODE_HOST = 'https://geocoding-api.open-meteo.com';
+  const MARINE_HOST = 'https://marine-api.open-meteo.com';
+
+  /**
+   * Standby gateway for the very same `/v1/forecast` endpoint.
+   *
+   * Open-Meteo serves the forecast from several addresses; some networks can
+   * reach only part of them (a blackholed node answers with a TCP timeout and
+   * nothing else, which the browser reports as ERR_CONNECTION_TIMED_OUT). The
+   * historical-forecast host returned a byte-for-byte equivalent payload —
+   * `current`, all 168 hourly rows and the 7 daily cards — from an address that
+   * such a network still reaches, so it is used as a second attempt instead of
+   * showing "Failed to fetch" to the visitor.
+   */
+  const FORECAST_FALLBACK_HOST = 'https://historical-forecast-api.open-meteo.com';
+
+  /** How far ahead the daily strip goes, and whether yesterday is included. */
+  const FORECAST_DAYS = 6;
+  const PAST_DAYS = 1;
+
+  /**
+   * The primary gateway only fails by timing out on a blackholed network, so it
+   * gets a shorter deadline than TIMEOUT_MS: the standby must get its turn
+   * while the visitor is still looking at the spinner.
+   */
+  const PRIMARY_TIMEOUT_MS = 8000;
+
+  /** Encoded once — sent to every endpoint so it stays in one place. */
+  const FORECAST_PARAMS = {
+    current:
+      'temperature_2m,relative_humidity_2m,apparent_temperature,is_day,' +
+      'weather_code,cloud_cover,pressure_msl,wind_speed_10m,' +
+      'wind_direction_10m,wind_gusts_10m',
+    hourly:
+      'temperature_2m,relative_humidity_2m,apparent_temperature,' +
+      'precipitation_probability,precipitation,weather_code,cloud_cover,' +
+      'pressure_msl,wind_speed_10m,wind_direction_10m,wind_gusts_10m,' +
+      'uv_index',
+    daily:
+      'weather_code,temperature_2m_max,temperature_2m_min,wind_speed_10m_max,' +
+      'sunrise,sunset,uv_index_max,precipitation_probability_max',
+    timezone: 'auto',
+    // Keep the numbers the UI (and ai.js) has always worked with.
+    temperature_unit: 'celsius',
+    wind_speed_unit: 'ms',
+    past_days: PAST_DAYS,
+    forecast_days: FORECAST_DAYS,
+  };
 
   /** Give up on a hanging request instead of leaving the app on "Loading". */
   const TIMEOUT_MS = 15000;
 
-  /** Searched cities are cached (city -> {lat, lon, timezone, sun}). */
+  /** Searched cities are cached (city -> {latitude, longitude, timezone}). */
   const GEO_CACHE_KEY = 'yw_geocode_cache';
 
   /**
    * Legacy backend (backend/src/main.rs) that used to serve
-   * GET <api-url>/?city=<name>. Empty means "disabled — use api-ninjas
+   * GET <api-url>/?city=<name>. Empty means "disabled — use Open-Meteo
    * directly"; set it through window.YW_API_URL, ?api=<url> or
    * <meta name="yw-api-url"> if you ever host it again.
    */
@@ -176,6 +244,8 @@ window.YW = window.YW || {};
     try {
       const parsed = JSON.parse(text);
       if (parsed && typeof parsed === 'object') {
+        // Open-Meteo reports its failures as {"reason": "...", "error": true}.
+        if (typeof parsed.reason === 'string') return parsed.reason;
         if (typeof parsed.error === 'string') return parsed.error;
         if (typeof parsed.errorMessage === 'string') return parsed.errorMessage;
       }
@@ -196,24 +266,29 @@ window.YW = window.YW || {};
 
   // ── HTTP ──
 
-  /** Turns an api-ninjas failure into an actionable, localized message. */
-  function apiNinjasMessage(status, detail) {
+  /** Turns an Open-Meteo failure into an actionable, localized message. */
+  function openMeteoMessage(status, detail) {
     const lower = String(detail || '').toLowerCase();
 
-    if (lower.indexOf('missing api key') !== -1) {
+    // A bad key shows up as a 400 whose `reason` mentions the apikey.
+    if (lower.indexOf('apikey') !== -1 || lower.indexOf('api key') !== -1) {
       return t(
-        'Weather API key missing: set one in js/api.js (DEFAULT_API_KEY) or call YW.api.setApiKey("<your key>")',
-        'Отсутствует ключ API погоды: укажите его в js/api.js (DEFAULT_API_KEY) или вызовите YW.api.setApiKey("<ваш ключ>")',
+        'Weather API key rejected (HTTP ' + status + '): Open-Meteo needs no key on the free tier — reset it with YW.api.setApiKey("")',
+        'Ключ API погоды отклонён (HTTP ' + status + '): на бесплатном тарифе Open-Meteo ключ не нужен — сбросьте его через YW.api.setApiKey("")',
       );
     }
-    if (lower.indexOf('invalid api key') !== -1) {
+    if (
+      status === 429 ||
+      lower.indexOf('limit') !== -1 ||
+      lower.indexOf('too many') !== -1
+    ) {
       return t(
-        'Weather API key rejected (HTTP ' + status + '): check the api-ninjas key',
-        'Ключ API погоды отклонён (HTTP ' + status + '): проверьте ключ api-ninjas',
+        'The free weather service is rate limited right now — try again in a minute',
+        'Бесплатный сервис погоды ограничил число запросов — попробуйте через минуту',
       );
     }
-    if (lower.indexOf('premium') !== -1) {
-      return t('api-ninjas refused the request: ', 'api-ninjas отклонил запрос: ') + detail;
+    if (lower.indexOf('no data') !== -1) {
+      return t('Open-Meteo refused the request: ', 'Open-Meteo отклонил запрос: ') + detail;
     }
     if (status >= 500) {
       return t(
@@ -230,35 +305,40 @@ window.YW = window.YW || {};
    * A fetch that lives in another realm — jsdom with an injected fetch, a
    * polyfill or a webview shim — rejects a signal it did not create, so the
    * request is retried once without the deadline instead of failing outright.
+   * Our *own* deadline firing is not that case: the request is over, and a
+   * retry without a signal would only add an unbounded second attempt (on a
+   * blackholed host that doubles the wait), so it is rethrown.
    */
   async function apiFetch(url, controller) {
-    const options = { headers: { 'X-Api-Key': apiKey } };
-    if (!controller) return fetch(url, options);
+    // Deliberately header-less: Open-Meteo authenticates (when it has to)
+    // through the `apikey` query parameter, and a header-less GET stays a
+    // CORS-"simple" request, so the browser never sends a preflight.
+    if (!controller) return fetch(url);
 
     try {
-      return await fetch(url, {
-        headers: options.headers,
-        signal: controller.signal,
-      });
+      return await fetch(url, { signal: controller.signal });
     } catch (err) {
+      if (controller.signal.aborted) throw err;
       const message = err && err.message ? String(err.message) : '';
       if (message.indexOf('signal') === -1) throw err;
       console.warn('[YW.api] retrying without an abort signal (' + message + ')');
-      return fetch(url, options);
+      return fetch(url);
     }
   }
 
   /**
-   * GETs a JSON document with the api-ninjas key, a deadline and errors that
-   * stay readable in the status card.
+   * GETs a JSON document with a deadline and errors that stay readable in the
+   * status card. `timeoutMs` overrides the standard deadline for a caller that
+   * cannot afford to wait for the full one (see PRIMARY_TIMEOUT_MS).
    */
-  async function getJson(url) {
+  async function getJson(url, timeoutMs) {
+    const deadline = typeof timeoutMs === 'number' ? timeoutMs : TIMEOUT_MS;
     const controller =
       typeof AbortController === 'function' ? new AbortController() : null;
     const timer = controller
       ? setTimeout(function () {
           controller.abort();
-        }, TIMEOUT_MS)
+        }, deadline)
       : null;
 
     let resp;
@@ -268,7 +348,7 @@ window.YW = window.YW || {};
       const aborted = err && err.name === 'AbortError';
       const reason = aborted
         ? t('no answer within ', 'нет ответа в течение ') +
-          Math.round(TIMEOUT_MS / 1000) +
+          Math.round(deadline / 1000) +
           's'
         : err && err.message
           ? err.message
@@ -292,7 +372,7 @@ window.YW = window.YW || {};
     if (!resp.ok) {
       const detail = describeBody(text);
       console.warn('[YW.api] ' + url + ' -> HTTP ' + resp.status + ': ' + detail);
-      throw apiError(apiNinjasMessage(resp.status, detail), resp.status, detail, url);
+      throw apiError(openMeteoMessage(resp.status, detail), resp.status, detail, url);
     }
 
     try {
@@ -316,14 +396,24 @@ window.YW = window.YW || {};
 
   // ── Providers ──
 
-  /** Builds an api-ninjas URL; the key always travels in a header. */
-  function apiNinjasUrl(path, params) {
+  /**
+   * Builds an Open-Meteo URL. When a key is configured it is appended as the
+   * `apikey` parameter (what the paid customer API expects); otherwise the URL
+   * stays plain, because the free tier needs no credentials at all.
+   */
+  function openMeteoUrl(host, path, params) {
     const query = Object.keys(params || {})
+      .filter(function (name) {
+        return params[name] !== undefined && params[name] !== null;
+      })
       .map(function (name) {
         return name + '=' + encodeURIComponent(params[name]);
       })
       .join('&');
-    return API_HOST + path + (query ? '?' + query : '');
+
+    const url = host + path + (query ? '?' + query : '');
+    if (!apiKey) return url;
+    return url + (query ? '&' : '?') + 'apikey=' + encodeURIComponent(apiKey);
   }
 
   /** Cached city -> coordinates/timezone lookups (localStorage, best effort). */
@@ -344,9 +434,120 @@ window.YW = window.YW || {};
   }
 
   /**
-   * Turns a city name into { name, latitude, longitude, country, timezone,
-   * sun }. The free tier refuses /v1/weather?city=, so a coordinate lookup
-   * always comes first. Latin and Cyrillic names both work.
+   * The interface language, so a geocoded city name comes back in the same
+   * script the rest of the page uses (Open-Meteo localizes `name` for us).
+   */
+  function currentLanguage() {
+    try {
+      const settings =
+        YW.settings && YW.settings.getSettings ? YW.settings.getSettings() : null;
+      const lang = settings && settings.language ? String(settings.language) : '';
+      return lang.slice(0, 2) || 'en';
+    } catch (err) {
+      return 'en';
+    }
+  }
+
+  /**
+   * Cyrillic -> Latin. Open-Meteo's geocoder only indexes the Latin spelling
+   * ("Сочи" returns nothing, "sochi" finds Sochi), so a Cyrillic query is
+   * transliterated as a second attempt — that way a Russian-language search
+   * keeps working exactly like it did with the previous provider.
+   */
+  const TRANSLITERATION = {
+    а: 'a',
+    б: 'b',
+    в: 'v',
+    г: 'g',
+    д: 'd',
+    е: 'e',
+    ё: 'e',
+    ж: 'zh',
+    з: 'z',
+    и: 'i',
+    й: 'i',
+    к: 'k',
+    л: 'l',
+    м: 'm',
+    н: 'n',
+    о: 'o',
+    п: 'p',
+    р: 'r',
+    с: 's',
+    т: 't',
+    у: 'u',
+    ф: 'f',
+    х: 'kh',
+    ц: 'ts',
+    ч: 'ch',
+    ш: 'sh',
+    щ: 'shch',
+    ъ: '',
+    ы: 'y',
+    ь: '',
+    э: 'e',
+    ю: 'yu',
+    я: 'ya',
+    і: 'i',
+    ї: 'i',
+    є: 'e',
+    ґ: 'g',
+  };
+
+  /** 'Сочи' -> 'sochi'; '' when there was nothing non-Latin to convert. */
+  function latinGuess(value) {
+    const text = String(value || '');
+    let out = '';
+    let changed = false;
+
+    for (let i = 0; i < text.length; i++) {
+      const ch = text.charAt(i).toLowerCase();
+      const mapped = TRANSLITERATION[ch];
+      if (mapped === undefined) {
+        out += ch;
+      } else {
+        out += mapped;
+        changed = true;
+      }
+    }
+
+    return changed ? out : '';
+  }
+
+  /** The geocoding URL for one spelling of a city name. */
+  function geocodeUrl(name) {
+    return openMeteoUrl(GEOCODE_HOST, '/v1/search', {
+      name: name,
+      count: 1,
+      language: currentLanguage(),
+      format: 'json',
+    });
+  }
+
+  /**
+   * One geocoding attempt: { name, latitude, longitude, country, timezone },
+   * or null when the spelling is not in the database.
+   */
+  async function geocodeLookup(name) {
+    const answer = await getJson(geocodeUrl(name));
+    const results = answer && Array.isArray(answer.results) ? answer.results : [];
+    const first = results.length > 0 ? results[0] : null;
+    if (!first || typeof first.latitude !== 'number') return null;
+
+    return {
+      name: first.name || name,
+      latitude: first.latitude,
+      longitude: first.longitude,
+      country: first.country || '',
+      timezone: first.timezone || '',
+    };
+  }
+
+  /**
+   * Turns a city name into { name, latitude, longitude, country, timezone }.
+   * Open-Meteo geocodes for free and understands both Latin and Cyrillic
+   * names (the latter through the transliteration above), so the app never
+   * needs coordinates from the visitor.
    */
   async function geocodeCity(city) {
     const lookup = String(city || '').trim();
@@ -363,110 +564,112 @@ window.YW = window.YW || {};
     const cache = readGeoCache();
     if (cache[cacheId]) return cache[cacheId];
 
-    const url = apiNinjasUrl('/v1/geocoding', { city: lookup });
-    const results = await getJson(url);
-    const first =
-      Array.isArray(results) && results.length > 0 ? results[0] : null;
+    let place = await geocodeLookup(lookup);
+    if (!place) {
+      const latin = latinGuess(lookup);
+      if (latin) place = await geocodeLookup(latin);
+    }
 
-    if (!first || typeof first.latitude !== 'number') {
+    if (!place) {
       throw apiError(
         t('City not found: ', 'Город не найден: ') + lookup,
         404,
         'geocoding returned no match',
-        url,
+        geocodeUrl(lookup),
       );
     }
-
-    const place = {
-      name: first.name || lookup,
-      latitude: first.latitude,
-      longitude: first.longitude,
-      country: first.country || '',
-      timezone: first.timezone || '',
-      sun: first.sun || null,
-    };
 
     cache[cacheId] = place;
     writeGeoCache(cache);
     return place;
   }
 
-  /** Current conditions for a coordinate pair. */
-  function fetchCurrent(latitude, longitude) {
-    return getJson(apiNinjasUrl('/v1/weather', { lat: latitude, lon: longitude }));
-  }
-
-  /** 40 three-hourly entries covering the next 5 days. */
+  /**
+   * One request carries everything the UI needs: current conditions, the
+   * hourly series (every hour of every day) and the daily summary. `past_days=1`
+   * is what makes a real Yesterday card possible.
+   */
   function fetchForecast(latitude, longitude) {
-    return getJson(
-      apiNinjasUrl('/v1/weatherforecast', { lat: latitude, lon: longitude }),
+    // Coordinates first: it keeps every Open-Meteo URL in this file readable
+    // and identical in shape (`?latitude=..&longitude=..&…`).
+    const params = Object.assign(
+      { latitude: latitude, longitude: longitude },
+      FORECAST_PARAMS,
     );
+    return forecastFrom(API_HOST, params);
   }
 
-  // ── Time zones & moon phase (computed locally, no extra request) ──
+  /** True for a transport failure, i.e. no HTTP answer came back at all. */
+  function isUnreachable(err) {
+    return !!(err && err.status === 0);
+  }
 
-  /** Returns the IANA zone when the runtime understands it, else null. */
-  function safeTimezone(timezone) {
-    if (!timezone) return null;
+  /**
+   * GETs the forecast from one gateway, with the standby gateway as a second
+   * attempt when the first one is unreachable.
+   *
+   * Only a transport failure falls through: `status === 0` means the host never
+   * answered (DNS, blackholed node, offline, CORS), while a real HTTP status
+   * means it did answer — and the standby serves the same data, so asking it
+   * again would only repeat the same error.
+   */
+  async function forecastFrom(host, params) {
+    const primary = openMeteoUrl(host, '/v1/forecast', params);
+
     try {
-      new Intl.DateTimeFormat('en-US', { timeZone: timezone });
-      return timezone;
+      return await getJson(primary, PRIMARY_TIMEOUT_MS);
     } catch (err) {
-      return null;
+      if (!isUnreachable(err)) throw err;
+      const standby = openMeteoUrl(FORECAST_FALLBACK_HOST, '/v1/forecast', params);
+      console.warn(
+        '[YW.api] ' + hostOf(primary) + ' is unreachable, retrying via ' + hostOf(standby),
+      );
+      return getJson(standby);
     }
   }
 
   /**
-   * Splits a unix timestamp into the city's local calendar date and clock time,
-   * e.g. 1791190800 in Europe/Moscow -> { date: '2026-10-05', time: '09:00' }.
-   * Falls back to UTC when the zone is unknown.
+   * Best-effort sea-surface temperature, only worth asking for near a coast.
+   * Inland coordinates make the marine API fail, so the failure is swallowed:
+   * `current.sea_temperature` simply stays null and the UI hides the row.
    */
-  function localParts(timestampSeconds, timezone) {
-    const ms = timestampSeconds * 1000;
-    const zone = safeTimezone(timezone);
-
-    if (!zone) {
-      const utc = new Date(ms).toISOString();
-      return { date: utc.slice(0, 10), time: utc.slice(11, 16) };
+  async function fetchMarine(latitude, longitude) {
+    try {
+      return await getJson(
+        openMeteoUrl(MARINE_HOST, '/v1/marine', {
+          latitude: latitude,
+          longitude: longitude,
+          hourly: 'sea_surface_temperature',
+          timezone: 'auto',
+          past_days: PAST_DAYS,
+          forecast_days: FORECAST_DAYS,
+        }),
+      );
+    } catch (err) {
+      console.warn(
+        '[YW.api] no sea data for ' +
+          latitude +
+          ',' +
+          longitude +
+          ': ' +
+          (err && err.message ? err.message : err),
+      );
+      return null;
     }
-
-    // sv-SE renders ISO-like local values: "2026-10-05 09:00".
-    const formatted = new Intl.DateTimeFormat('sv-SE', {
-      timeZone: zone,
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: false,
-    }).format(new Date(ms));
-
-    const parts = formatted.split(' ');
-    return { date: parts[0], time: (parts[1] || '00:00').slice(0, 5) };
   }
+
+  // ── Time zones & moon phase (computed locally, no extra request) ──
+
+  // Open-Meteo is asked for `timezone=auto`, so every timestamp it returns is
+  // already a local-time ISO string for the city ('2026-10-05T09:00'). That
+  // makes IANA arithmetic unnecessary here: date = slice(0, 10) and
+  // time = slice(11, 16) is all the mappers below need.
 
   /** Shifts a 'YYYY-MM-DD' string by whole days (calendar-safe, UTC based). */
   function shiftDate(dateStr, days) {
     const date = new Date(dateStr + 'T00:00:00Z');
     date.setUTCDate(date.getUTCDate() + days);
     return date.toISOString().slice(0, 10);
-  }
-
-  /** Today's calendar date in the city, not in the visitor's own zone. */
-  function localToday(timezone) {
-    return localParts(Math.floor(Date.now() / 1000), timezone).date;
-  }
-
-  /**
-   * Converts an ISO instant (the geocoding `sun` block is UTC) into the city's
-   * local 'YYYY-MM-DDTHH:MM' — the shape helpers.formatTime() understands.
-   */
-  function localIsoTime(iso, timezone) {
-    if (!iso) return undefined;
-    const ms = Date.parse(iso);
-    if (isNaN(ms)) return undefined;
-    const parts = localParts(Math.floor(ms / 1000), timezone);
-    return parts.date + 'T' + parts.time;
   }
 
   /**
@@ -499,213 +702,305 @@ window.YW = window.YW || {};
     return { name: name, illumination: Math.round(illumination * 10) / 10 };
   }
 
-  // ── Mapping api-ninjas -> WeatherResponse ──
+  // ── Mapping Open-Meteo -> WeatherResponse ──
 
-  /** Ranks conditions so a day's summary picks the most "eventful" weather. */
-  const CONDITION_SEVERITY = [
-    'tornado',
-    'squall',
-    'thunder',
-    'snow',
-    'sleet',
-    'freezing',
-    'shower',
-    'rain',
-    'drizzle',
-    'fog',
-    'mist',
-    'haze',
-    'smoke',
-    'dust',
-    'sand',
-    'ash',
-    'overcast',
-    'cloud',
-    'clear',
-  ];
+  /**
+   * WMO weather interpretation codes -> the description strings the rest of
+   * the app already speaks. These are the exact keys of helpers.CONDITION_RU
+   * and the substrings helpers.conditionIconFromText() looks for, so both the
+   * emoji picker and the Russian translation table keep working unchanged.
+   */
+  const WMO_CONDITIONS = {
+    0: 'Clear sky',
+    1: 'Mainly clear',
+    2: 'Partly cloudy',
+    3: 'Overcast',
+    45: 'Fog',
+    48: 'Depositing rime fog',
+    51: 'Light drizzle',
+    53: 'Moderate drizzle',
+    55: 'Dense drizzle',
+    56: 'Light freezing drizzle',
+    57: 'Dense freezing drizzle',
+    61: 'Slight rain',
+    63: 'Moderate rain',
+    65: 'Heavy rain',
+    66: 'Light freezing rain',
+    67: 'Heavy freezing rain',
+    71: 'Slight snow fall',
+    73: 'Moderate snow fall',
+    75: 'Heavy snow fall',
+    77: 'Snow grains',
+    80: 'Slight rain showers',
+    81: 'Moderate rain showers',
+    82: 'Violent rain showers',
+    85: 'Slight snow showers',
+    86: 'Heavy snow showers',
+    95: 'Thunderstorm',
+    96: 'Thunderstorm with slight hail',
+    99: 'Thunderstorm with heavy hail',
+  };
 
-  /** Higher = more noteworthy (0 for "clear", negative for the tail). */
-  function severityOf(condition) {
-    const lower = String(condition || '').toLowerCase();
-    let rank = 0;
-    for (let i = 0; i < CONDITION_SEVERITY.length; i++) {
-      if (lower.indexOf(CONDITION_SEVERITY[i]) !== -1) {
-        rank = CONDITION_SEVERITY.length - i;
-        break;
-      }
-    }
-    return rank;
-  }
-
-  /** The day's most frequent description; ties go to the harsher one. */
-  function dominantCondition(entries) {
-    const counts = {};
-    entries.forEach((entry) => {
-      const description = entry.weather_description || 'Unknown';
-      counts[description] = (counts[description] || 0) + 1;
-    });
-    return (
-      Object.keys(counts).sort((a, b) => {
-        if (counts[b] !== counts[a]) return counts[b] - counts[a];
-        return severityOf(b) - severityOf(a);
-      })[0] || 'Unknown'
-    );
-  }
-
-  /** Converts unix seconds into the city's local 'YYYY-MM-DDTHH:MM'. */
-  function localIsoFromUnix(seconds, timezone) {
-    if (seconds == null) return undefined;
-    const parts = localParts(seconds, timezone);
-    return parts.date + 'T' + parts.time;
+  /** The description for a WMO code; 'Unknown' when the code is missing. */
+  function describeWeather(code) {
+    if (code == null) return 'Unknown';
+    return WMO_CONDITIONS[code] || 'Unknown';
   }
 
   /**
-   * Folds the three-hourly entries into one card per day. Day 0 additionally
-   * carries sunrise/sunset, because the geocoding `sun` block only describes
-   * today — later days simply omit them (the UI shows "N/A").
+   * Reads one value out of a parallel array. Open-Meteo ships `null` for the
+   * points it cannot compute, and the UI hides a row fed `null` instead of
+   * printing a fake zero — so anything non-finite collapses to null here.
    */
-  function buildDaily(intervals, timezone, sun) {
-    const days = [];
-    const byDate = {};
-
-    (intervals || []).forEach((interval) => {
-      const parts = localParts(interval.timestamp, timezone);
-      let day = byDate[parts.date];
-
-      if (!day) {
-        day = {
-          date: parts.date,
-          entries: [],
-          temperature_max: -Infinity,
-          temperature_min: Infinity,
-          wind_speed_max: 0,
-        };
-        byDate[parts.date] = day;
-        days.push(day);
-      }
-
-      day.entries.push(interval);
-      const high = interval.max_temp != null ? interval.max_temp : interval.temp;
-      const low = interval.min_temp != null ? interval.min_temp : interval.temp;
-      day.temperature_max = Math.max(day.temperature_max, high);
-      day.temperature_min = Math.min(day.temperature_min, low);
-      day.wind_speed_max = Math.max(day.wind_speed_max, interval.wind_speed || 0);
-    });
-
-    return days.map((day, index) => {
-      const moon = moonPhaseForDate(day.date);
-      return {
-        date: day.date,
-        temperature_max: day.temperature_max === -Infinity ? 0 : day.temperature_max,
-        temperature_min: day.temperature_min === Infinity ? 0 : day.temperature_min,
-        wind_speed_max: day.wind_speed_max,
-        condition: dominantCondition(day.entries),
-        sunrise: index === 0 ? localIsoTime(sun && sun.sunrise, timezone) : undefined,
-        sunset: index === 0 ? localIsoTime(sun && sun.sunset, timezone) : undefined,
-        moon_phase_name: moon.name,
-        moon_illumination: moon.illumination,
-        // Not published by api-ninjas — the UI hides these rows.
-        uv_index_max: null,
-        precipitation_probability_max: null,
-      };
-    });
+  function numberAt(series, index) {
+    if (!series || index < 0 || index >= series.length) return null;
+    const value = series[index];
+    return typeof value === 'number' && isFinite(value) ? value : null;
   }
 
-  /** Normalises one three-hourly entry into the UI's HourlyData shape. */
-  function buildHourly(intervals, timezone) {
-    return (intervals || []).map((interval) => {
-      const parts = localParts(interval.timestamp, timezone);
-      return {
-        date: parts.date,
-        time: parts.time,
-        temperature: interval.temp,
-        wind_speed: interval.wind_speed,
-        condition: interval.weather_description || 'Unknown',
-        // Not published by api-ninjas — the UI hides these rows.
-        pressure: null,
-        sea_temperature: null,
-        uv_index: null,
-        precipitation_probability: null,
-      };
-    });
+  /**
+   * Reads one scalar out of the `current` block, which — unlike `hourly` and
+   * `daily` — is an object of plain numbers rather than parallel arrays.
+   */
+  function currentNumber(current, name) {
+    const value = current ? current[name] : undefined;
+    return typeof value === 'number' && isFinite(value) ? value : null;
   }
 
-  /** CurrentData, plus the coordinates/timezone ai.js can use for context. */
-  function buildCurrent(observation, place, timezone) {
+  /** Folds one column of the daily block into a DailyData card. */
+  function dailyCard(daily, index) {
+    const date = String((daily.time || [])[index] || '').slice(0, 10);
+    const moon = moonPhaseForDate(date);
+
     return {
-      temperature: observation.temp,
-      feels_like: observation.feels_like,
-      humidity: observation.humidity,
-      wind_speed: observation.wind_speed,
-      wind_degrees: observation.wind_degrees,
-      cloud_pct: observation.cloud_pct,
-      weather_code: observation.weather_code,
-      is_day: observation.is_day,
-      condition: observation.weather_description || 'Unknown',
-      // Not published by api-ninjas — the UI hides these rows.
-      pressure: null,
-      sea_temperature: null,
-      uv_index: null,
-      precipitation_probability: null,
-      sunrise: localIsoFromUnix(observation.sunrise, timezone),
-      sunset: localIsoFromUnix(observation.sunset, timezone),
-      latitude: place.latitude,
-      longitude: place.longitude,
-      timezone: timezone,
+      date: date,
+      temperature_max: numberAt(daily.temperature_2m_max, index),
+      temperature_min: numberAt(daily.temperature_2m_min, index),
+      wind_speed_max: numberAt(daily.wind_speed_10m_max, index),
+      condition: describeWeather(numberAt(daily.weather_code, index)),
+      // Unlike api-ninjas, Open-Meteo knows the sun times of every single day.
+      sunrise: daily.sunrise ? daily.sunrise[index] : undefined,
+      sunset: daily.sunset ? daily.sunset[index] : undefined,
+      moon_phase_name: moon.name,
+      moon_illumination: moon.illumination,
+      uv_index_max: numberAt(daily.uv_index_max, index),
+      precipitation_probability_max: numberAt(
+        daily.precipitation_probability_max,
+        index,
+      ),
     };
   }
 
-  /** Assembles the WeatherResponse the UI has always consumed. */
-  function buildWeatherResponse(city, place, observation, intervals) {
-    const timezone = place.timezone;
-    const today = localToday(timezone);
+  /** One card per forecast day; yesterday gets a field of its own instead. */
+  function buildDaily(daily, today) {
+    const dates = (daily && daily.time) || [];
+    const days = [];
+
+    for (let i = 0; i < dates.length; i++) {
+      const date = String(dates[i]).slice(0, 10);
+      if (date < today) continue;
+      days.push(dailyCard(daily, i));
+    }
+
+    return days;
+  }
+
+  /**
+   * Yesterday's card. It only exists because the forecast request asks for
+   * `past_days=1`, so day -1 is part of that very same answer.
+   */
+  function buildYesterday(daily, today) {
+    const dates = (daily && daily.time) || [];
+    const wanted = shiftDate(today, -1);
+
+    for (let i = 0; i < dates.length; i++) {
+      if (String(dates[i]).slice(0, 10) === wanted) return dailyCard(daily, i);
+    }
+
+    return null;
+  }
+
+  /** Today's sunrise/sunset, shown in the current-conditions card. */
+  function todaySun(daily, today) {
+    const dates = (daily && daily.time) || [];
+    const index = dates.findIndex(function (value) {
+      return String(value).slice(0, 10) === today;
+    });
+
+    if (index === -1) return { sunrise: undefined, sunset: undefined };
+    return {
+      sunrise: daily.sunrise ? daily.sunrise[index] : undefined,
+      sunset: daily.sunset ? daily.sunset[index] : undefined,
+    };
+  }
+
+  /**
+   * Normalises the hourly block into the UI's HourlyData shape — one row per
+   * hour, so the chart can draw a point for every hour of the day. `seaByTime`
+   * maps a local ISO hour to its sea-surface temperature (empty for a city that
+   * is not on a coast).
+   */
+  function buildHourly(hourly, seaByTime) {
+    const times = (hourly && hourly.time) || [];
+    const rows = [];
+
+    for (let i = 0; i < times.length; i++) {
+      const iso = String(times[i]);
+
+      rows.push({
+        date: iso.slice(0, 10),
+        time: iso.slice(11, 16),
+        temperature: numberAt(hourly.temperature_2m, i),
+        feels_like: numberAt(hourly.apparent_temperature, i),
+        humidity: numberAt(hourly.relative_humidity_2m, i),
+        wind_speed: numberAt(hourly.wind_speed_10m, i),
+        wind_degrees: numberAt(hourly.wind_direction_10m, i),
+        cloud_pct: numberAt(hourly.cloud_cover, i),
+        condition: describeWeather(numberAt(hourly.weather_code, i)),
+        pressure: numberAt(hourly.pressure_msl, i),
+        uv_index: numberAt(hourly.uv_index, i),
+        precipitation_probability: numberAt(hourly.precipitation_probability, i),
+        precipitation: numberAt(hourly.precipitation, i),
+        sea_temperature: seaByTime ? seaByTime[iso] || null : null,
+      });
+    }
+
+    return rows;
+  }
+
+  /** Maps every local ISO hour of the marine answer to its sea temperature. */
+  function seaTemperatures(marine) {
+    const hourly = (marine && marine.hourly) || {};
+    const times = hourly.time || [];
+    const byTime = {};
+
+    for (let i = 0; i < times.length; i++) {
+      const value = numberAt(hourly.sea_surface_temperature, i);
+      if (value != null) byTime[String(times[i])] = value;
+    }
+
+    return byTime;
+  }
+
+  /** The index of `hourly` closest to `nowIso` (-1 when the series is empty). */
+  function nearestHourIndex(hourly, nowIso) {
+    const times = (hourly && hourly.time) || [];
+    if (times.length === 0) return -1;
+    if (!nowIso) return 0;
+
+    const now = Date.parse(String(nowIso));
+    let best = 0;
+    let bestGap = Infinity;
+
+    for (let i = 0; i < times.length; i++) {
+      const gap = Math.abs(Date.parse(String(times[i])) - now);
+      if (gap < bestGap) {
+        bestGap = gap;
+        best = i;
+      }
+    }
+
+    return best;
+  }
+
+  /** The marine reading closest to `nowIso`, null when there is none. */
+  function nearestSeaTemperature(seaByTime, nowIso) {
+    const times = Object.keys(seaByTime || {});
+    if (times.length === 0) return null;
+    if (!nowIso) return seaByTime[times[0]];
+
+    const now = Date.parse(String(nowIso));
+    let best = null;
+    let bestGap = Infinity;
+
+    times.forEach(function (key) {
+      const gap = Math.abs(Date.parse(key) - now);
+      if (gap < bestGap) {
+        bestGap = gap;
+        best = seaByTime[key];
+      }
+    });
+
+    return best;
+  }
+
+  /** CurrentData, plus the coordinates/timezone ai.js can use for context. */
+  function buildCurrent(forecast, place, seaByTime) {
+    const current = forecast.current || {};
+    const hourly = forecast.hourly || {};
+    const nowIso = current.time;
+    // The `current` block has no UV/probability column, so those two are taken
+    // from the hourly row closest to "now" — that is what the card displays.
+    const index = nearestHourIndex(hourly, nowIso);
+    const sun = todaySun(forecast.daily, String(nowIso || '').slice(0, 10));
+    const code = currentNumber(current, 'weather_code');
+
+    return {
+      temperature: currentNumber(current, 'temperature_2m'),
+      feels_like: currentNumber(current, 'apparent_temperature'),
+      humidity: currentNumber(current, 'relative_humidity_2m'),
+      wind_speed: currentNumber(current, 'wind_speed_10m'),
+      wind_degrees: currentNumber(current, 'wind_direction_10m'),
+      cloud_pct: currentNumber(current, 'cloud_cover'),
+      weather_code: code,
+      is_day: currentNumber(current, 'is_day') === 1,
+      condition: describeWeather(code),
+      pressure: currentNumber(current, 'pressure_msl'),
+      sea_temperature: nearestSeaTemperature(seaByTime, nowIso),
+      uv_index: numberAt(hourly.uv_index, index),
+      precipitation_probability: numberAt(hourly.precipitation_probability, index),
+      sunrise: sun.sunrise,
+      sunset: sun.sunset,
+      latitude: place.latitude,
+      longitude: place.longitude,
+      timezone: place.timezone,
+    };
+  }
+
+  /**
+   * Assembles the WeatherResponse the UI has always consumed. Everything comes
+   * out of a single forecast answer, so every timestamp is already city-local
+   * ISO text — no timezone arithmetic anywhere below.
+   */
+  function buildWeatherResponse(city, place, forecast, marine) {
+    const current = forecast.current || {};
+    const today = String(current.time || '').slice(0, 10);
+    const seaByTime = seaTemperatures(marine);
 
     return {
       city: place.name || city,
-      current: buildCurrent(observation, place, timezone),
-      hourly: buildHourly(intervals, timezone),
-      // No historical endpoint: the UI drops the Yesterday tab (no hourly
-      // entries for it) and the Yesterday point of the daily chart.
-      yesterday: null,
-      forecast: buildDaily(intervals, timezone, place.sun),
+      current: buildCurrent(forecast, place, seaByTime),
+      hourly: buildHourly(forecast.hourly, seaByTime),
+      // `past_days=1` makes yesterday part of the same answer.
+      yesterday: buildYesterday(forecast.daily, today),
+      forecast: buildDaily(forecast.daily, today),
       local_today: today,
       local_yesterday: shiftDate(today, -1),
       // Extra context for the AI module and for debugging.
       latitude: place.latitude,
       longitude: place.longitude,
-      timezone: timezone,
-      source: 'api-ninjas',
+      timezone: place.timezone || forecast.timezone || 'UTC',
+      source: 'open-meteo',
     };
   }
 
-  /** The default provider: geocode -> current + forecast -> map. */
-  async function fetchFromApiNinjas(city) {
-    if (!apiKey) {
-      throw apiError(
-        t(
-          'Weather API key missing: set one in js/api.js (DEFAULT_API_KEY) or call YW.api.setApiKey("<your key>")',
-          'Отсутствует ключ API погоды: укажите его в js/api.js (DEFAULT_API_KEY) или вызовите YW.api.setApiKey("<ваш ключ>")',
-        ),
-        401,
-        'no api key',
-        '',
-      );
-    }
-
+  /** The default provider: geocode -> forecast (+ marine) -> map. */
+  async function fetchFromOpenMeteo(city) {
     const place = await geocodeCity(city);
 
-    // Current conditions and the 5-day series are independent requests.
+    // Marine data is a coastal bonus. A city far from the sea simply has no
+    // sea point, which open-meteo reports as an empty series — so the row is
+    // hidden instead of failing the whole lookup.
     const answers = await Promise.all([
-      fetchCurrent(place.latitude, place.longitude),
       fetchForecast(place.latitude, place.longitude),
+      fetchMarine(place.latitude, place.longitude).catch(function () {
+        return null;
+      }),
     ]);
 
     return buildWeatherResponse(city, place, answers[0], answers[1]);
   }
 
-
-
-  // ── Legacy backend ──
 
   /**
    * Self-hosted backend (backend/src/main.rs): GET <url>/?city=<name>.
@@ -766,7 +1061,7 @@ window.YW = window.YW || {};
   // ── Public entry point ──
 
   /**
-   * Looks a city up. api-ninjas is used unless a legacy backend URL was
+   * Looks a city up. Open-Meteo is used unless a legacy backend URL was
    * configured (window.YW_API_URL / ?api= / <meta name="yw-api-url">).
    *
    * Rejects with a localized Error whose `status`, `detail` and `url`
@@ -774,17 +1069,20 @@ window.YW = window.YW || {};
    */
   async function fetchWeather(city, _tempUnit, _windUnit) {
     if (apiUrl) return fetchFromBackend(city, apiUrl);
-    return fetchFromApiNinjas(city);
+    return fetchFromOpenMeteo(city);
   }
 
   YW.api = {
     fetchWeather: fetchWeather,
 
-    /** The api-ninjas key currently in use. */
+    /** The optional Open-Meteo key in use ('' on the free tier). */
     getApiKey: function () {
       return apiKey;
     },
-    /** Swaps the api-ninjas key at runtime; '' restores the committed one. */
+    /**
+     * Swaps the optional Open-Meteo key at runtime; '' restores the default.
+     * The free tier never needs it — a key only raises the paid rate limits.
+     */
     setApiKey: function (next) {
       apiKey = normalizeKey(next) || DEFAULT_API_KEY;
       return apiKey;
@@ -805,7 +1103,7 @@ window.YW = window.YW || {};
       }
     },
 
-    /** Legacy backend URL in use ('' means "api-ninjas directly"). */
+    /** Legacy backend URL in use ('' means "Open-Meteo directly"). */
     getApiUrl: function () {
       return apiUrl;
     },
@@ -820,5 +1118,7 @@ window.YW = window.YW || {};
     /** Kept for backwards compatibility with the first port of api.ts. */
     API_URL: apiUrl,
     API_HOST: API_HOST,
+    /** Standby gateway used when API_HOST cannot be reached at all. */
+    FORECAST_FALLBACK_HOST: FORECAST_FALLBACK_HOST,
   };
 })(window.YW);

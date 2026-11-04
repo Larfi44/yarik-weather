@@ -18,7 +18,7 @@ window.YW = window.YW || {};
 
   // ── Scoring helpers matching ai_service.py ──────────────────────────
 
-  /** api-ninjas does not publish every metric: treat unknowns as 0. */
+  /** A metric can be missing (the API sends null): treat unknowns as 0. */
   function num(value) {
     const parsed = Number(value);
     return isFinite(parsed) ? parsed : 0;
@@ -95,8 +95,8 @@ window.YW = window.YW || {};
       thunderstorm: 'гроза',
     };
     const key = String(cond || '').toLowerCase();
-    // api-ninjas descriptions ("broken clouds", "mist", …) are not in this
-    // table: fall back to the shared helper, which knows them too.
+    // Descriptions outside this short list (the WMO wording, "fog", …) are not
+    // in this table: fall back to the shared helper, which knows them too.
     if (map[key]) return map[key];
     return YW.helpers && YW.helpers.translateCondition
       ? YW.helpers.translateCondition(cond, lang)
@@ -290,6 +290,12 @@ window.YW = window.YW || {};
       const nowHour = now.getHours();
 
       hourly.forEach((hr) => {
+        // The series starts with yesterday's rows (past_days=1), and a "best
+        // time" must never point at a day that is already over.
+        if (weather.local_today && hr.date && hr.date < weather.local_today) {
+          return;
+        }
+
         const hIsRain = rainFlag(hr.condition, hr.precipitation_probability);
         const hWalk = walkScore(
           hr.temperature,
@@ -352,7 +358,7 @@ window.YW = window.YW || {};
     let weekTotalRain = 0;
     let weekMaxUv = 0;
 
-    // api-ninjas publishes neither precipitation probability nor UV, so those
+    // Precipitation probability and UV can be missing for a city, so those
     // aggregates are only meaningful when the data is actually there.
     const hasRainData = nextWeekDays.some(
       (day) => day.precipitation_probability_max != null,
@@ -753,7 +759,8 @@ window.YW = window.YW || {};
         const weekRows = [
           statRow('🌡️', t('Avg', 'Средняя температура'), week.avg_temp + '°'),
         ];
-        // Rain and UV are optional: api-ninjas does not publish them.
+        // Rain and UV can still be missing for some points: show them when
+        // the answer has them.
         if (week.total_rain != null) {
           weekRows.push(
             statRow('🌧️', t('Rain', 'Дождь'), week.total_rain + 'mm'),

@@ -8,11 +8,11 @@ echo "  Yarik Weather – Android Build"
 echo "========================================="
 
 # ---- Frontend Build ----
-echo "Building static frontend (frontend/public -> frontend/out)..."
-bash frontend/scripts/build.sh
+echo "Building static frontend (index.html + src/ -> src/out)..."
+bash src/scripts/build.sh
 
-# No bundler involved: out/ is exactly what Tauri bundles (frontendDist).
-echo "  Web assets prepared in frontend/out/"
+# No bundler involved: src/out/ is exactly what Tauri bundles (frontendDist).
+echo "  Web assets prepared in src/out/"
 
 # ---- Launcher icon ----
 echo "Generating icons..."
@@ -57,8 +57,8 @@ fi
   "$APK_PATH"
 
 # ---- Copy to downloads ----
-mkdir -p frontend/public/downloads
-cp yarik-weather.apk frontend/public/downloads/
+mkdir -p src/assets/downloads
+cp yarik-weather.apk src/assets/downloads/
 
 # ---- Clean up the root copy ----
 rm -f yarik-weather.apk
@@ -66,5 +66,5 @@ rm -f yarik-weather.apk
 echo ""
 echo "========================================="
 echo "  ✅ Android .apk ready!"
-echo "  frontend/public/downloads/yarik-weather.apk"
+echo "  src/assets/downloads/yarik-weather.apk"
 echo "========================================="

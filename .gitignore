@@ -15,14 +15,11 @@ backend/Cargo.lock
 backend/model_*.onnx
 backend/vendor/
 
-# Frontend (plain HTML/CSS/JS — no bundler, build = copy public/ -> out/)
-frontend/out/
+# Site (plain HTML/CSS/JS — no bundler, build = index.html + src/ -> src/out/)
 out/
-frontend/dist/
-frontend/download/
-frontend/public/downloads/
-frontend/public/keystore.jks
-frontend/public/favicon_hired.png
+src/assets/keystore.jks
+src/assets/downloads/
+src/assets/favicon-hired.png
 
 # Tauri generated files
 src-tauri/gen/
@@ -55,30 +52,27 @@ android/
 *.app
 
 # Node modules
-frontend/node_modules/
+node_modules/
 
 # Build dist folders
-frontend/dist-android/
-frontend/dist-desktop/
+src-tauri/target/
 
 # Downloads / APK / DMG
-frontend/assets/downloads/
-frontend/public/downloads/
+src/assets/downloads/
 
 # Mac app bundle
-frontend/YarikWeather.app/
-frontend/*.dmg
+src-tauri/target/release/bundle/
 
 # Large data files
 backend/models.pkl
 backend/ai/*.pkl
 
 # Logs
-frontend/dev.log
+dev.log
 
 # Android .apk
 *.apk
 *.apk.idsig
 
 # Prisma generated
-frontend/node_modules/.prisma/
+node_modules/.prisma/

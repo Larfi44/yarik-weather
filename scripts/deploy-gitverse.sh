@@ -6,7 +6,7 @@
 #    branch  - Git branch that holds the site (default: pages)
 #    remote  - Git remote to push to       (default: gitverse)
 #
-#  Builds frontend/out, puts its contents on the given branch and
+#  Builds src/out, puts its contents on the given branch and
 #  pushes it. Then enable Pages ONCE in the web UI:
 #    gitverse.ru -> yarik-weather -> Settings -> Pages
 #    source: branch "pages", folder "/"
@@ -19,14 +19,14 @@ cd "$(dirname "$0")/.."
 BRANCH="${1:-pages}"
 REMOTE="${2:-gitverse}"
 
-echo "==> 1/3 Building static site (frontend/public -> frontend/out)"
-bash frontend/scripts/build.sh
+echo "==> 1/3 Building static site (index.html + src/ -> src/out)"
+bash src/scripts/build.sh
 
 # Stage the built site in a temporary folder
 SITE_DIR=$(mktemp -d)
 WORKTREE=$(mktemp -d)
 trap 'git worktree remove --force "$WORKTREE" 2>/dev/null || true; rm -rf "$SITE_DIR"' EXIT
-cp -R frontend/out/. "$SITE_DIR/"
+cp -R src/out/. "$SITE_DIR/"
 # Disable GitVerse's built-in Jekyll processing for plain static files
 touch "$SITE_DIR/.nojekyll"
 

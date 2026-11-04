@@ -188,7 +188,7 @@ window.YW = window.YW || {};
     'Slight rain showers': 'Небольшие ливни',
     'Violent rain showers': 'Сильные ливни',
     'Slight snow showers': 'Небольшой снегопад',
-    // api-ninjas (OpenWeather-style) descriptions.
+    // OpenWeather-style descriptions (legacy backend / older payloads).
     'Few clouds': 'Небольшая облачность',
     'Scattered clouds': 'Рассеянные облака',
     'Broken clouds': 'Облачно с прояснениями',
@@ -221,7 +221,7 @@ window.YW = window.YW || {};
     'Volcanic ash': 'Вулканический пепел',
   };
 
-  /** Case-insensitive view of the table (api-ninjas uses lower-case text). */
+  /** Case-insensitive view of the table (the API text can be lower-case). */
   const CONDITION_RU_LOWER = (function () {
     const map = {};
     Object.keys(CONDITION_RU).forEach(function (key) {

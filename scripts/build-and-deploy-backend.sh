@@ -2,8 +2,8 @@
 # ============================================================
 #  LEGACY / OPT-IN — the website does not need this anymore.
 #
-#  The browser gets its weather straight from api-ninjas
-#  (see frontend/README.md), and the Yandex Cloud containers
+#  The browser gets its weather straight from Open-Meteo
+#  (see src/README.md), and the Yandex Cloud containers
 #  this script targets no longer exist, so the registry,
 #  service-account and container details below must be
 #  updated before it can work again. It is no longer called
@@ -88,8 +88,8 @@ done 2>/dev/null || true
 # ---- Point the frontend at the freshly deployed container ----
 # A serverless container keeps its id across revisions, and its public URL is
 # https://<container-id>.containers.yandexcloud.net. Print both endpoints so the
-# weather one can be copied into <meta name="yw-api-url"> in
-# frontend/public/index.html (see also frontend/public/js/api.js).
+# weather one can be copied into <meta name="yw-api-url"> in index.html (or set
+# at runtime with YW.api.setApiUrl()), see also src/js/api.js.
 #
 # NOTE: this script still targets the ids of the (now deleted) cloud folder:
 # registry crp5q6mqrcrcaiah7fgf and service account ajetvd45epqtuua9l6ob. Update

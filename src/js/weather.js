@@ -109,7 +109,10 @@ window.YW = window.YW || {};
       pressure_unit: PressureUnit.HPa,
       lang: Language.English,
       theme: Theme.Light,
-      selectedHourlyDay: 0,
+      // -1 means "not chosen yet": the first render selects today's tab, so the
+      // chart opens on the current day (and its "now" marker) instead of on the
+      // yesterday series that past_days=1 adds to the front.
+      selectedHourlyDay: -1,
     };
 
     // Mutable DOM references, rebuilt on every render.
@@ -148,7 +151,11 @@ window.YW = window.YW || {};
       const hPadX = 45;
       const hPadding = 60;
       const hPlotHeight = hViewHeight - 2 * hPadding;
-      const hStepX = displayedHours.length > 1 ? 70 : 0;
+      // Every hour of the day is plotted now (24 points), so the columns tighten
+      // up: 38px each keeps one day a single swipe wide instead of three
+      // screens, while short series keep the roomy 70px spacing.
+      const dense = displayedHours.length > 12;
+      const hStepX = displayedHours.length > 1 ? (dense ? 38 : 70) : 0;
       const hSvgWidth =
         displayedHours.length < 2
           ? 300
@@ -198,6 +205,8 @@ window.YW = window.YW || {};
         plotHeight: hPlotHeight,
         stepX: hStepX,
         svgWidth: hSvgWidth,
+        /** True when a full 24-hour day is drawn (tighter labels/spacing). */
+        dense: dense,
         toY: hToY,
         pointsLine: displayedHours
           .map(
@@ -213,8 +222,8 @@ window.YW = window.YW || {};
 
     /** Daily chart geometry (yesterday + forecast). */
     function buildDailyContext(data) {
-      // Yesterday is optional: api-ninjas has no historical endpoint, so the
-      // daily chart simply starts with today in that case.
+      // Yesterday is optional: when the past day is missing the daily chart
+      // simply starts with today.
       const chartDays = (data.yesterday ? [data.yesterday] : []).concat(
         data.forecast || [],
       );
@@ -443,8 +452,8 @@ window.YW = window.YW || {};
         '💨 ' + windS,
       ];
 
-      // Pressure, UV and precipitation are not published by api-ninjas: drop
-      // the rows instead of showing a made-up zero.
+      // A metric can be missing for a city: drop the row instead of showing a
+      // made-up zero.
       if (hour.precipitation_probability != null) {
         lines.push('🌧️ ' + precipS);
       }
@@ -517,8 +526,8 @@ window.YW = window.YW || {};
           ')',
       ];
 
-      // api-ninjas publishes neither precipitation probability nor UV here:
-      // skip those rows rather than printing zeros.
+      // Rain probability and UV can be missing: skip those rows rather than
+      // printing zeros.
       if (day.precipitation_probability_max != null) {
         lines.push(
           '🌧️ ' +
@@ -576,7 +585,7 @@ window.YW = window.YW || {};
         ),
       ];
 
-      // api-ninjas always reports these two, so show them instead.
+      // These two are always reported, so show them next to the optional rows.
       if (current.feels_like != null) {
         details.push(
           h(
@@ -604,8 +613,8 @@ window.YW = window.YW || {};
         );
       }
 
-      // Pressure, UV and precipitation probability are not part of the
-      // api-ninjas payload: omit the rows instead of showing zeros.
+      // Pressure, UV and rain probability can be missing from an answer: omit
+      // the rows instead of showing zeros.
       if (current.pressure != null) {
         details.push(
           h(
@@ -691,6 +700,12 @@ window.YW = window.YW || {};
       const hours = ctx.displayedHours;
       const geo = ctx.hourly;
       const dayLabel = ctx.dayLabels[state.selectedHourlyDay] || '';
+      // 24 points a day: the per-point decorations shrink so an hour's icon,
+      // temperature and time still read cleanly in a 38px column.
+      const iconSize = geo.dense ? 15 : 20;
+      const iconOffset = geo.dense ? 27 : 34;
+      const tempOffset = geo.dense ? 14 : 16;
+      const hourSize = geo.dense ? 10 : 12;
 
       const tabs = h(
         'div',
@@ -721,7 +736,7 @@ window.YW = window.YW || {};
           y2: geo.viewHeight - geo.padding + 10,
           stroke: 'var(--muted, #444)',
           'stroke-width': 0.5,
-          opacity: 0.3,
+          opacity: geo.dense ? 0.18 : 0.3,
         }),
       );
 
@@ -777,9 +792,9 @@ window.YW = window.YW || {};
               'text',
               {
                 x: x,
-                y: y - 34,
+                y: y - iconOffset,
                 'text-anchor': 'middle',
-                'font-size': 20,
+                'font-size': iconSize,
                 fill: 'white',
                 class: 'chart-label-icon',
               },
@@ -789,9 +804,9 @@ window.YW = window.YW || {};
               'text',
               {
                 x: x,
-                y: y - 16,
+                y: y - tempOffset,
                 'text-anchor': 'middle',
-                'font-size': 12,
+                'font-size': geo.dense ? 11 : 12,
                 fill: ctx.labelColor,
                 class: 'chart-label-temp',
               },
@@ -804,7 +819,7 @@ window.YW = window.YW || {};
                 x: x,
                 y: geo.viewHeight - 8,
                 'text-anchor': 'middle',
-                'font-size': 12,
+                'font-size': hourSize,
                 fill: 'var(--muted, #ccc)',
               },
               hour.time,

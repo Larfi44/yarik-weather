@@ -3,8 +3,8 @@
    custom classes defined in this file plus a few inline styles. */
 
 :root {
-  --accent: rgb(255, 125, 0);
-  --accent2: #5a9e4b;
+  --accent: rgb(0, 128, 128);
+  --accent2: #18cb33;
   --muted: #888;
   --text: #1a1a1a;
   --yw-bg: #f0f4f8;
@@ -14,7 +14,7 @@
 }
 
 .theme-dark {
-  --accent: rgb(255, 125, 0);
+  --accent: rgb(0, 128, 128);
   --accent2: #6dbf6d;
   --muted: #9ca3af;
   --text: #e5e7eb;
