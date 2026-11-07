@@ -67,6 +67,10 @@ window.YW = window.YW || {};
       root.classList.add(themeClass);
       shell.classList.remove('theme-light', 'theme-dark');
       shell.classList.add(themeClass);
+      // The inline boot script in index.html sets this for the first frame;
+      // keeping it in sync here makes native scrollbars / form controls follow
+      // a runtime toggle instead of staying light.
+      root.style.colorScheme = themeClass === 'theme-dark' ? 'dark' : 'light';
       aiBtn.style.color = resolvedTheme() === Theme.Light ? 'blue' : 'cyan';
       // The static shell text depends on the language, which lives in the
       // settings, so refresh it together with the theme.

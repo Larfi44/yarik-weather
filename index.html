@@ -11,11 +11,44 @@
          YW.api.setApiKey('<key>'). -->
     <link rel="icon" href="src/assets/favicon.svg" />
     <link rel="stylesheet" href="src/main.css" />
+    <!-- Theme boot: paint the saved theme before the first frame.
+         app.js only runs once every deferred module has loaded, which is long
+         enough for the page to paint light first and then flip to dark
+         (~0.2 s flash). This tiny inline copy of the same rule — saved
+         settings.theme, with prefers-color-scheme standing in for "auto" —
+         sets the class on <html> while the document is still parsing, so the
+         very first paint is already dark. -->
+    <script>
+      (function () {
+        var theme = 'light';
+        try {
+          var raw = localStorage.getItem('weather_settings');
+          var saved = 'auto';
+          if (raw) {
+            var parsed = JSON.parse(raw);
+            saved = (parsed && parsed.theme) || 'auto';
+          }
+          var prefersDark = window.matchMedia
+            ? window.matchMedia('(prefers-color-scheme: dark)').matches
+            : false;
+          var dark = saved === 'dark' || (saved !== 'light' && prefersDark);
+          theme = dark ? 'dark' : 'light';
+        } catch (e) {
+          /* unreadable storage: keep the light default */
+        }
+        var root = document.documentElement;
+        root.classList.add('theme-' + theme);
+        // Native scrollbars / form controls should match, too.
+        root.style.colorScheme = theme;
+      })();
+    </script>
   </head>
   <body>
     <!-- Static app shell. All dynamic parts (weather, status cards, modals)
-         are rendered by the scripts below — see js/app.js for the entry point. -->
-    <div class="app-shell theme-light" id="app-shell">
+         are rendered by the scripts below — see js/app.js for the entry point.
+         The theme class lives on <html> (set above, then mirrored by
+         app.js:applyTheme), so the shell carries no hard-coded theme. -->
+    <div class="app-shell" id="app-shell">
       <div class="app-container">
         <div class="header glass-card">
           <div class="brand">

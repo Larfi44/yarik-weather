@@ -540,8 +540,8 @@ window.YW = window.YW || {};
       point.minCircle.setAttribute('r', 7);
 
       const lang = ctx.lang;
-      const highLabel = lang === Language.English ? 'Highest' : 'Макс';
-      const lowLabel = lang === Language.English ? 'Lowest' : 'Мин';
+      const highLabel = lang === Language.English ? 'Highest' : 'Макс. темп.';
+      const lowLabel = lang === Language.English ? 'Lowest' : 'Мин. темп.';
       const windVal = H.convertWind(day.wind_speed_max, ctx.wind_unit);
       const windCat = H.windCategory(day.wind_speed_max);
 
@@ -549,11 +549,13 @@ window.YW = window.YW || {};
         H.conditionIconFromText(day.condition) +
           ' ' +
           H.translateCondition(day.condition, lang),
-        highLabel +
+        '🌡️ ' +
+          highLabel +
           ': ' +
           H.convertTemp(day.temperature_max, ctx.temp_unit).toFixed(0) +
           ctx.tStr,
-        lowLabel +
+        '🌡️ ' +
+          lowLabel +
           ': ' +
           H.convertTemp(day.temperature_min, ctx.temp_unit).toFixed(0) +
           ctx.tStr,

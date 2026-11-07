@@ -393,7 +393,7 @@ window.YW = window.YW || {};
       t(
         'Next week in ' +
           weather.city +
-          ': Avg ' +
+          ': Average temperature ' +
           Math.round(weekAvgTemp * 10) / 10 +
           '°C',
         'На следующей неделе в ' +
@@ -415,7 +415,7 @@ window.YW = window.YW || {};
       weekParts.push(
         t(
           'max UV ' + Math.round(weekMaxUv * 10) / 10,
-          'макс. Ультрафиолет ' + Math.round(weekMaxUv * 10) / 10,
+          'Максимальный ультрафиолет ' + Math.round(weekMaxUv * 10) / 10,
         ),
       );
     }
@@ -760,7 +760,11 @@ window.YW = window.YW || {};
       const week = predict.next_week;
       if (week) {
         const weekRows = [
-          statRow('🌡️', t('Avg', 'Средняя температура'), week.avg_temp + '°'),
+          statRow(
+            '🌡️',
+            t('Average temperature', 'Средняя температура'),
+            week.avg_temp + '°',
+          ),
         ];
         // Rain and UV can still be missing for some points: show them when
         // the answer has them.
@@ -773,7 +777,7 @@ window.YW = window.YW || {};
           weekRows.push(
             statRow(
               '☀️',
-              t('Max UV', 'Макс. Ультрафиолет'),
+              t('Max UV', 'Максимальный ультрафиолет'),
               String(week.max_uv),
             ),
           );
@@ -804,7 +808,11 @@ window.YW = window.YW || {};
 
         months.forEach((m) => {
           const monthRows = [
-            statRow('🌡️', t('Avg', 'Средняя температура'), m.avg_temp + '°'),
+            statRow(
+              '🌡️',
+              t('Average temperature', 'Средняя температура'),
+              m.avg_temp + '°',
+            ),
           ];
           if (m.total_rain != null) {
             monthRows.push(
@@ -815,7 +823,7 @@ window.YW = window.YW || {};
             monthRows.push(
               statRow(
                 '☀️',
-                t('Max UV', 'Макс. Ультрафиолет'),
+                t('Max UV', 'Максимальный ультрафиолет'),
                 String(m.max_uv),
               ),
             );

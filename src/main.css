@@ -713,10 +713,6 @@ body {
   font-size: 0.9rem;
 }
 
-.ai-table td:first-child {
-  color: var(--muted);
-}
-
 /* ── Download Modal ── */
 .download-modal {
   max-width: 634px;

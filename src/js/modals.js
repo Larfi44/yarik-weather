@@ -243,7 +243,7 @@ window.YW = window.YW || {};
     function pressureRow(en) {
       return choiceRow(en ? 'Pressure unit:' : 'Единица давления:', [
         {
-          label: 'hPa',
+          label: en ? 'hPa' : 'гПа',
           active: temp.pressure_unit === PressureUnit.HPa,
           onclick: () => update({ pressure_unit: PressureUnit.HPa }),
         },
