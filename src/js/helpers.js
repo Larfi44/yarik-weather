@@ -343,18 +343,28 @@ window.YW = window.YW || {};
 
   // ── Day labels ──
 
-  function formatDayLabel(dateStr, lang) {
+  /**
+   * "05 ноября (Вт)" — the date plus the weekday in brackets.
+   *
+   * `options.weekday === false` drops the bracketed weekday: the daily chart
+   * gives every column its own slot on the axis, so the bracket only ate the
+   * room the date needed to breathe.
+   */
+  function formatDayLabel(dateStr, lang, options) {
+    const opts = options || {};
     const date = new Date(dateStr + 'T00:00:00');
     if (isNaN(date.getTime())) return dateStr;
     const day = date.getDate().toString().padStart(2, '0');
     const month = date.getMonth() + 1;
     const monthName =
       lang === Language.English ? monthNameEn(month) : monthNameRu(month);
+    const label = day + ' ' + monthName;
+    if (opts.weekday === false) return label;
     const weekdays_en = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
     const weekdays_ru = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
     const wd = (date.getDay() + 6) % 7; // Monday = 0
     const weekday = lang === Language.English ? weekdays_en[wd] : weekdays_ru[wd];
-    return day + ' ' + monthName + ' (' + weekday + ')';
+    return label + ' (' + weekday + ')';
   }
 
   // ── Day length ──

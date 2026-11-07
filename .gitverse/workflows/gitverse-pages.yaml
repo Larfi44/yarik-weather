@@ -1,0 +1,28 @@
+name: Publish Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # The site is plain HTML/CSS/JS and the weather comes from Open-Meteo,
+      # so there is nothing to install: the "build" just assembles src/out.
+      - name: Build static site
+        run: bash src/scripts/build.sh
+
+      - name: Upload pages artifact
+        uses: gitverse/upload-pages-artifact@v1.0.0
+        with:
+          path: src/out
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: gitverse/deploy-pages@v1.0.0

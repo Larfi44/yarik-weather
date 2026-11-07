@@ -71,13 +71,14 @@ window.YW = window.YW || {};
   }
 
   /** External <a> link (styled inline) that routes through openExternal. */
-  function externalLink(url, label, style, isTauri) {
+  function externalLink(url, label, style, isTauri, className) {
     return h(
       'a',
       {
         href: url,
         target: '_blank',
         rel: 'noopener noreferrer',
+        class: className || null,
         style: style,
         onclick: (event) => {
           event.preventDefault();
@@ -303,23 +304,16 @@ window.YW = window.YW || {};
     }
 
     function footer(en) {
+      // Yarik Studio is the brand mark of the footer, so it wears the accent
+      // (turquoise in the dark theme, teal in the light one) instead of its own
+      // colour. The two calls to action keep their own colours — orange for
+      // Donate, red for support — and share the `.settings-cta` hover lift.
       const studioStyle = {
-        color: '#f97316',
+        color: 'var(--accent)',
         textDecoration: 'none',
         fontWeight: 600,
         cursor: 'pointer',
         fontSize: 'inherit',
-      };
-      const supportStyle = {
-        display: 'inline-block',
-        backgroundColor: '#ef4444',
-        color: '#fff',
-        textDecoration: 'none',
-        cursor: 'pointer',
-        fontSize: '0.85rem',
-        padding: '10px 20px',
-        borderRadius: '8px',
-        fontWeight: 600,
       };
 
       return h('div', {}, [
@@ -354,8 +348,9 @@ window.YW = window.YW || {};
             externalLink(
               SUPPORT_URL,
               '🛠️ ' + (en ? 'Technical support' : 'Техподдержка'),
-              supportStyle,
+              null,
               isTauri,
+              'settings-cta settings-cta-support',
             ),
           ],
         ),
@@ -372,12 +367,7 @@ window.YW = window.YW || {};
             h(
               'button',
               {
-                class: 'primary-btn',
-                style: {
-                  fontSize: '0.9rem',
-                  padding: '10px 20px',
-                  textDecoration: 'none',
-                },
+                class: 'settings-cta settings-cta-donate',
                 onclick: () => openExternal(DONATE_URL, isTauri),
               },
               en ? '❤️ Donate' : '❤️ Поддержать',

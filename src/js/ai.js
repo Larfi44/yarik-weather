@@ -151,7 +151,10 @@ window.YW = window.YW || {};
       current.condition,
       current.precipitation_probability,
     );
-    const coastal = YW.isCoastal(weather.city);
+    // Both spellings: the typed one (what the headline shows) and the
+    // geocoder's own, so «Сочи» and "Sochi" behave the same.
+    const coastal =
+      YW.isCoastal(weather.city) || YW.isCoastal(weather.city_name || '');
 
     // ── Scores matching ai_service.py exactly ──
     const cScore = comfortScore(

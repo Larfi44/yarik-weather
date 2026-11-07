@@ -72,10 +72,33 @@ window.YW = window.YW || {};
   }
 
   /**
+   * True when the lookup landed on a seaside town, so the sea-temperature rows
+   * may be shown. Two spellings are checked: the one the visitor typed (which
+   * is what the headline shows — «Сочи» stays «Сочи») and the geocoder's own
+   * ("Sochi"); the coastal table in coastal.js holds both. Matching ignores
+   * case, dots and hyphens.
+   */
+  function isCoastalCity(data) {
+    if (!data) return false;
+    const check = YW.isCoastal;
+    if (typeof check !== 'function') return false;
+    return check(data.city) || check(data.city_name || '');
+  }
+
+  /**
    * Places a fixed-position tooltip next to a data point, flipping it to the
    * left of the point when the point sits in the right half of the SVG.
    */
-  function tooltipPosition(svgEl, x, y, svgWidth, svgHeight, tipW, tipH, offset) {
+  function tooltipPosition(
+    svgEl,
+    x,
+    y,
+    svgWidth,
+    svgHeight,
+    tipW,
+    tipH,
+    offset,
+  ) {
     const rect = svgEl.getBoundingClientRect();
     const scaleX = rect.width / svgWidth;
     const scaleY = rect.height / svgHeight;
@@ -301,9 +324,9 @@ window.YW = window.YW || {};
         pStr: YW.settings.pressureUnitStr(pressure_unit, lang),
         condIcon: H.conditionIconFromText(data.current.condition),
         // Orange line for max temperatures, blue for min (same in both themes).
-        maxLineColor: '#e8913a',
+        maxLineColor: 'rgb(24, 169, 163)',
         minLineColor: '#006aff',
-        pointFillMax: '#e8913a',
+        pointFillMax: 'rgb(24, 169, 163)',
         pointFillMin: '#006aff',
         labelColor: 'var(--text)',
         minLineOpacity: 1.0,
@@ -313,6 +336,8 @@ window.YW = window.YW || {};
         dayLabels: buildDayLabels(groups, data, lang),
         hourly: buildHourlyContext(data, displayedHours, todayIndex),
         daily: buildDailyContext(data),
+        /** Coastal lookups also carry a sea temperature; inland ones do not. */
+        coastal: isCoastalCity(data),
       };
     }
 
@@ -339,7 +364,10 @@ window.YW = window.YW || {};
       const container = chartScrollEl;
       requestAnimationFrame(() => {
         if (!container.querySelector('svg')) return;
-        const scrollLeft = Math.max(0, ctx.hourly.nowLine.x - container.clientWidth / 2);
+        const scrollLeft = Math.max(
+          0,
+          ctx.hourly.nowLine.x - container.clientWidth / 2,
+        );
         if (typeof container.scrollTo === 'function') {
           container.scrollTo({ left: scrollLeft, behavior: 'smooth' });
         } else {
@@ -414,6 +442,7 @@ window.YW = window.YW || {};
       const windVal = H.convertWind(hour.wind_speed, ctx.wind_unit);
       const windCat = H.windCategory(hour.wind_speed);
       const windS =
+        '💨 ' +
         (lang === Language.English ? 'Wind' : 'Ветер') +
         ': ' +
         windVal.toFixed(1) +
@@ -448,8 +477,10 @@ window.YW = window.YW || {};
         H.conditionIconFromText(hour.condition) +
           ' ' +
           H.translateCondition(hour.condition, lang),
-        H.convertTemp(hour.temperature, ctx.temp_unit).toFixed(0) + ctx.tStr,
-        '💨 ' + windS,
+        '🌡️ ' +
+          H.convertTemp(hour.temperature, ctx.temp_unit).toFixed(0) +
+          ctx.tStr,
+        windS,
       ];
 
       // A metric can be missing for a city: drop the row instead of showing a
@@ -462,6 +493,17 @@ window.YW = window.YW || {};
       }
       if (hour.uv_index != null) {
         lines.push(uvS);
+      }
+      // Same rule as the details card: the water temperature belongs to the
+      // hour under the cursor, and only a coastal lookup has one.
+      if (hour.sea_temperature != null && ctx.coastal) {
+        lines.push(
+          '🌊 ' +
+            (lang === Language.English ? 'Sea temp' : 'Темп. моря') +
+            ': ' +
+            H.convertTemp(hour.sea_temperature, ctx.temp_unit).toFixed(1) +
+            ctx.tStr,
+        );
       }
 
       const pos = hourlySvgEl
@@ -569,23 +611,10 @@ window.YW = window.YW || {};
       const en = lang === Language.English;
       const current = data.current;
 
-      const details = [
-        h(
-          'p',
-          {},
-          '💨 ' +
-            (en ? 'Wind' : 'Ветер') +
-            ': ' +
-            H.convertWind(current.wind_speed, ctx.wind_unit).toFixed(1) +
-            ' ' +
-            ctx.wStr +
-            ' (' +
-            H.translateCategory(H.windCategory(current.wind_speed), lang) +
-            ')',
-        ),
-      ];
+      // Feels-like comes first when it is reported, then the wind row that is
+      // always there, then the optional metrics.
+      const details = [];
 
-      // These two are always reported, so show them next to the optional rows.
       if (current.feels_like != null) {
         details.push(
           h(
@@ -599,6 +628,23 @@ window.YW = window.YW || {};
           ),
         );
       }
+
+      details.push(
+        h(
+          'p',
+          {},
+          '💨 ' +
+            (en ? 'Wind' : 'Ветер') +
+            ': ' +
+            H.convertWind(current.wind_speed, ctx.wind_unit).toFixed(1) +
+            ' ' +
+            ctx.wStr +
+            ' (' +
+            H.translateCategory(H.windCategory(current.wind_speed), lang) +
+            ')',
+        ),
+      );
+
       if (current.humidity != null) {
         details.push(
           h(
@@ -623,7 +669,9 @@ window.YW = window.YW || {};
             '📊 ' +
               (en ? 'Pressure' : 'Давление') +
               ': ' +
-              H.convertPressure(current.pressure, ctx.pressure_unit).toFixed(1) +
+              H.convertPressure(current.pressure, ctx.pressure_unit).toFixed(
+                1,
+              ) +
               ' ' +
               ctx.pStr +
               ' (' +
@@ -661,7 +709,7 @@ window.YW = window.YW || {};
         );
       }
 
-      if (current.sea_temperature != null && YW.isCoastal(data.city)) {
+      if (current.sea_temperature != null && ctx.coastal) {
         details.push(
           h(
             'p',
@@ -669,7 +717,7 @@ window.YW = window.YW || {};
             '🌊 ' +
               (en ? 'Sea temp' : 'Темп. моря') +
               ': ' +
-              H.convertTemp(current.sea_temperature || 0, ctx.temp_unit).toFixed(1) +
+              H.convertTemp(current.sea_temperature, ctx.temp_unit).toFixed(1) +
               ctx.tStr,
           ),
         );
@@ -680,7 +728,8 @@ window.YW = window.YW || {};
         h(
           'div',
           { class: 'temp-large' },
-          H.convertTemp(current.temperature, ctx.temp_unit).toFixed(1) + ctx.tStr,
+          H.convertTemp(current.temperature, ctx.temp_unit).toFixed(1) +
+            ctx.tStr,
         ),
         h('div', { class: 'condition-line' }, [
           h('span', { class: 'condition-icon' }, ctx.condIcon),
@@ -715,8 +764,7 @@ window.YW = window.YW || {};
             'button',
             {
               class:
-                'hourly-tab' +
-                (state.selectedHourlyDay === i ? ' active' : ''),
+                'hourly-tab' + (state.selectedHourlyDay === i ? ' active' : ''),
               onclick: () => {
                 state.selectedHourlyDay = i;
                 render();
@@ -969,7 +1017,9 @@ window.YW = window.YW || {};
             (thisDate.getTime() - todayDate.getTime()) / (1000 * 60 * 60 * 24),
           );
           if (diff === 1) label = en ? 'Tomorrow' : 'Завтра';
-          else label = H.formatDayLabel(day.date, ctx.lang);
+          // No bracketed weekday here: the column already sits under its own
+          // day, so the plain date is enough.
+          else label = H.formatDayLabel(day.date, ctx.lang, { weekday: false });
         }
 
         const text = (opts, content) => s('text', opts, content);
@@ -1032,12 +1082,23 @@ window.YW = window.YW || {};
         );
       });
 
+      // No scrolling needed here — a week of days fits at once — so the chart
+      // is fluid instead of a fixed-width drawing: the viewBox keeps the exact
+      // geometry the points were placed with, while `width: 100%` stretches the
+      // whole axis across the card. `min-width` keeps eight columns readable on
+      // a phone: below it the card scrolls sideways like the hourly one.
       const svg = s(
         'svg',
         {
           viewBox: '0 0 ' + geo.svgWidth + ' ' + geo.chartHeight,
-          width: geo.svgWidth,
-          style: { display: 'block', overflow: 'visible' },
+          preserveAspectRatio: 'xMidYMid meet',
+          style: {
+            display: 'block',
+            width: '100%',
+            height: 'auto',
+            minWidth: '560px',
+            overflow: 'visible',
+          },
         },
         [gridLines, yLabels, maxLine, minLine, points],
       );
@@ -1201,12 +1262,19 @@ window.YW = window.YW || {};
         timeToMinutes(sunsetTime),
       );
 
-      const gridTimes = [
-        { min: 0, label: '12AM' },
-        { min: 360, label: '6AM' },
-        { min: 720, label: '12PM' },
-        { min: 1080, label: '6PM' },
-      ];
+      // Captions follow the language: English keeps the AM/PM labels the chart
+      // has always shown, Russian reads a 24-hour clock (00:00 … 18:00).
+      const hourLabel = (minutes) => {
+        const hour = minutes / 60;
+        if (!en) return String(hour).padStart(2, '0') + ':00';
+        const h12 = hour % 12 === 0 ? 12 : hour % 12;
+        return h12 + (hour < 12 ? 'AM' : 'PM');
+      };
+
+      const gridTimes = [0, 360, 720, 1080].map((min) => ({
+        min: min,
+        label: hourLabel(min),
+      }));
 
       // Sky gradient swaps with the theme; the sun glow dims at night.
       const defs = s('defs', {}, [
@@ -1352,17 +1420,13 @@ window.YW = window.YW || {};
         'font-family': '-apple-system, sans-serif',
       };
 
-      const riseText = s(
-        'text',
-        Object.assign({ x: sun.riseX }, labelAttrs),
-        [sunriseTime],
-      );
+      const riseText = s('text', Object.assign({ x: sun.riseX }, labelAttrs), [
+        sunriseTime,
+      ]);
 
-      const setText = s(
-        'text',
-        Object.assign({ x: sun.setX }, labelAttrs),
-        [sunsetTime],
-      );
+      const setText = s('text', Object.assign({ x: sun.setX }, labelAttrs), [
+        sunsetTime,
+      ]);
 
       // Current sun position — always visible.
       const nowGlow = s('circle', {
@@ -1432,9 +1496,13 @@ window.YW = window.YW || {};
         h('div', { class: 'astronomy-grid' }, [
           // Left: sun path diagram
           h('div', { class: 'astro-card sun-path-card' }, [sunSvg]),
-          // Right: moon info
-          h('div', { class: 'astro-card' }, [
-            h('p', { style: { fontSize: '3rem' } }, [moonEmoji]),
+          // Right: moon info — everything centred in its card (both axes), so
+          // the emoji, phase and illumination read as one block instead of
+          // hugging the top edge next to the taller sun diagram.
+          h('div', { class: 'astro-card moon-card' }, [
+            h('p', { class: 'moon-emoji', style: { fontSize: '3rem' } }, [
+              moonEmoji,
+            ]),
             h('p', {}, [H.translateMoonPhase(moonPhase, lang)]),
             h('p', {}, [moonIllumStr]),
           ]),

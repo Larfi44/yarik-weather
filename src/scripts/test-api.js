@@ -397,7 +397,12 @@ async function testMapping() {
     calls.every((c) => !!c.init.signal),
   );
 
-  check('city name comes from geocoding', data.city === 'Sochi', data.city);
+  check('the headline keeps the typed spelling', data.city === 'Sochi', data.city);
+  check(
+    'the geocoder spelling is kept beside it (coastal check)',
+    data.city_name === 'Sochi',
+    String(data.city_name),
+  );
   check(
     'current temperature',
     data.current.temperature === 19,
@@ -633,9 +638,9 @@ async function testMapping() {
   });
   const cyrillicData = await cyrillic.api.fetchWeather('Сочи');
   check(
-    'a Cyrillic city is transliterated when needed',
-    cyrillicData.city === 'Sochi',
-    cyrillicData.city,
+    'a Cyrillic search keeps its Cyrillic headline',
+    cyrillicData.city === 'Сочи' && cyrillicData.city_name === 'Sochi',
+    cyrillicData.city + ' / ' + String(cyrillicData.city_name),
   );
   check(
     'the second geocoding attempt uses the Latin spelling',
@@ -997,7 +1002,11 @@ async function testLive() {
   const { api } = boot({ live: true });
   const data = await api.fetchWeather('Сочи');
 
-  check('Cyrillic city resolves', data.city === 'Sochi', data.city);
+  check(
+    'Cyrillic city resolves and keeps its spelling',
+    data.city === 'Сочи' && !!data.city_name,
+    data.city + ' / ' + String(data.city_name),
+  );
   check(
     'coordinates were resolved',
     typeof data.latitude === 'number' && data.latitude !== 0,

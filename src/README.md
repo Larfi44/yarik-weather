@@ -27,12 +27,17 @@ GET marine-api.open-meteo.com/v1/marine?…&hourly=sea_surface_temperature
 *Yesterday* card and chart point possible.
 
 The answers are folded into the same `WeatherResponse` shape the old Rust
-backend returned (`city`, `current`, `hourly`, `yesterday`, `forecast`,
-`local_today`, `local_yesterday`, `latitude`, `longitude`, `timezone`,
-`source`), so `weather.js`, `ai.js` and the modals were not rewritten. Six daily
-cards come from the daily block, the hourly series keeps **every hour of every
-day** (24 points a day, so the hourly chart plots the whole day), and the moon
-phase is still computed locally.
+backend returned (`city`, `city_name`, `current`, `hourly`, `yesterday`,
+`forecast`, `local_today`, `local_yesterday`, `latitude`, `longitude`,
+`timezone`, `source`), so `weather.js`, `ai.js` and the modals were not
+rewritten. Six daily cards come from the daily block, the hourly series keeps
+**every hour of every day** (24 points a day, so the hourly chart plots the whole
+day), and the moon phase is still computed locally.
+
+`city` is **exactly what the visitor typed** — search "sochi" and the headline
+says "sochi", search «Сочи» and it says «Сочи»; the name is never translated
+behind their back. `city_name` is the geocoder's own (localised) spelling and is
+only used for the coastal check below.
 
 Requests are header-less (`fetch(url)` only), which keeps every call a
 CORS-"simple" request (no preflight), with a 15 s `AbortSignal` deadline
@@ -67,7 +72,18 @@ instead of printing a fake zero.
 Open-Meteo's geocoder only matches the Latin spelling ("Сочи" finds nothing,
 "sochi" finds Sochi), so `api.js` transliterates a query that came back empty
 and retries once (`TRANSLITERATION` + `latinGuess()`). The coordinate cache
-stays keyed on what the user typed.
+stays keyed on what the user typed, and the headline keeps that typed spelling
+(`city`), while the geocoder's answer is parked in `city_name`.
+
+### Coastal cities
+
+The sea-temperature rows (details card + hourly tooltip) only exist where there
+is a sea: `coastal.js` holds the same five lists the Rust backend uses
+(`COASTAL_CITIES_EN` / `COASTAL_CITIES_RU` in `backend/src/main.rs`, plus the
+extra spellings), all run through `normalizeCity()` (lower-case, `ё`→`е`,
+dots/hyphens→spaces), so «Сочи», «сочи», "Sochi" and "  SOCHI " all match. Both
+`city` and `city_name` are checked, which is why a Cyrillic search still finds
+the water.
 
 ## API key
 

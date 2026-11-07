@@ -225,6 +225,11 @@ window.YW = window.YW || {};
       Settings.saveSettings(settings);
       themeBtn.textContent = Settings.themeIcon(settings.theme);
       applyTheme();
+      // The CSS-driven parts recolour themselves through the theme class, but
+      // the sun-path card paints its sky gradient (and its glow/fill opacities)
+      // from the *resolved* theme at build time — without this repaint the
+      // diagram keeps the old sky until the next reload.
+      renderWeather();
     });
 
     aiBtn.addEventListener('click', () => {

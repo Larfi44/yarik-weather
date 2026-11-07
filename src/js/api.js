@@ -25,8 +25,12 @@
  * The answers are folded into the same WeatherResponse shape the UI
  * (weather.js / ai.js) has always consumed:
  *
- *   { city, current, hourly[], yesterday, forecast[], local_today,
+ *   { city, city_name, current, hourly[], yesterday, forecast[], local_today,
  *     local_yesterday }
+ *
+ * `city` is exactly what the visitor typed (the headline is never translated
+ * behind their back), `city_name` is the geocoder's localised spelling — used
+ * for the coastal check, so «Сочи» and "Sochi" both find the sea row.
  *
  * Unlike api-ninjas, Open-Meteo publishes every metric this UI renders, so the
  * rows that used to be hidden are populated for real:
@@ -861,7 +865,10 @@ window.YW = window.YW || {};
         uv_index: numberAt(hourly.uv_index, i),
         precipitation_probability: numberAt(hourly.precipitation_probability, i),
         precipitation: numberAt(hourly.precipitation, i),
-        sea_temperature: seaByTime ? seaByTime[iso] || null : null,
+        // A 0 °C reading is real (the Baltic in January), so only a missing
+        // key becomes null — the tooltip then hides just that row.
+        sea_temperature:
+          seaByTime && seaByTime[iso] != null ? seaByTime[iso] : null,
       });
     }
 
@@ -966,9 +973,14 @@ window.YW = window.YW || {};
     const current = forecast.current || {};
     const today = String(current.time || '').slice(0, 10);
     const seaByTime = seaTemperatures(marine);
+    // The headline keeps the spelling the visitor typed — «Сочи» stays «Сочи»
+    // and "sochi" stays "sochi" — while `city_name` carries the geocoder's
+    // localized spelling, which is what the coastal check also looks at.
+    const typed = String(city == null ? '' : city).trim();
 
     return {
-      city: place.name || city,
+      city: typed || place.name || '',
+      city_name: place.name || typed || '',
       current: buildCurrent(forecast, place, seaByTime),
       hourly: buildHourly(forecast.hourly, seaByTime),
       // `past_days=1` makes yesterday part of the same answer.
