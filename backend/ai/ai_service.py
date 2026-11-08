@@ -52,6 +52,7 @@ class TodayRequest(BaseModel):
     uv_index: float = 0.0
     precipitation_probability: float = 0.0
     humidity: Optional[float] = 50
+    feels_like: Optional[float] = None
     hourly: List[dict] = []
     daily: List[dict] = []
     lang: str = "en"
@@ -167,28 +168,67 @@ def rain_flag(cond, prob):
     return 1 if ("rain" in c or "drizzle" in c or prob >= 30) else 0
 
 
-def comfort(temp, wind, uv, prob, is_rain):
-    prob_fraction = prob / 100.0
+# The "best walk time" tip may only point at 06:00-21:59 — a walk is a daytime
+# plan, so an ideal 03:00 never wins it (kept in sync with src/js/ai.js).
+WALK_FROM_HOUR = 6
+WALK_UNTIL_HOUR = 22
+
+
+def _band_penalty(temp, low, high, cold_slope, hot_slope=None):
+    """Degrees outside [low, high], priced per degree (hot slope defaults)."""
+    hot_slope = cold_slope if hot_slope is None else hot_slope
+    if temp < low:
+        return (low - temp) * cold_slope
+    if temp > high:
+        return (temp - high) * hot_slope
+    return 0.0
+
+
+def _above(value, threshold, slope):
+    """Whatever is above `threshold`, priced per unit."""
+    return max(0.0, (value or 0.0) - threshold) * slope
+
+
+def _air_penalty(humidity):
+    """Muggy (>60 %) or bone-dry (<30 %) air; a missing reading costs nothing."""
+    if not humidity:
+        return 0.0
+    if humidity > 60:
+        return (humidity - 60) * 0.04
+    if humidity < 30:
+        return (30 - humidity) * 0.03
+    return 0.0
+
+
+def comfort(feels, humidity, wind, uv, prob, is_rain):
+    """
+    Comfort of being outside: a mild 19-24 °C plateau of the *apparent*
+    temperature, the air itself, wind chill, sunburn and light rain.
+
+    It is deliberately not the walk formula with a shifted ideal temperature —
+    that made both scores land on the same number almost every day.
+    """
     s = (
         10.0
-        - abs(temp - 21.0) * 0.15
-        - wind * 0.2
-        - prob_fraction * 2.0
-        - max(0.0, uv - 8.0) * 0.5
-        - (2.0 if is_rain else 0.0)
+        - _band_penalty(feels, 19.0, 24.0, 0.3)
+        - _air_penalty(humidity)
+        - _above(wind, 3.0, 0.25)
+        - ((prob or 0.0) / 100.0) * 2.0
+        - _above(uv, 7.0, 0.6)
+        - (1.5 if is_rain else 0.0)
     )
     return round(max(0.0, min(10.0, s)), 1)
 
 
 def walk(temp, wind, uv, prob, is_rain):
-    prob_fraction = prob / 100.0
+    """Quality of a walk: cooler ideal, and rain / gusts / sun cost far more."""
     s = (
         10.0
-        - abs(temp - 18.0) * 0.2
-        - wind * 0.2
-        - prob_fraction * 2.0
-        - (2.0 if is_rain else 0.0)
-        - (1.5 if uv > 8 else 0.0)
+        - _band_penalty(temp, 12.0, 20.0, 0.35, 0.45)
+        - _above(wind, 4.0, 0.3)
+        - ((prob or 0.0) / 100.0) * 3.5
+        - _above(uv, 5.0, 0.6)
+        - (3.5 if is_rain else 0.0)
     )
     return round(max(0.0, min(10.0, s)), 1)
 
@@ -196,13 +236,17 @@ def walk(temp, wind, uv, prob, is_rain):
 def swim(temp, sea_temp, month, is_rain, coastal):
     if not coastal or not sea_temp or sea_temp <= 17:
         return 0.0
-    s = 5 + (temp - 20) * 0.15
+    # Generous baseline: once the water is warm enough to swim at all, the day
+    # is worth a positive number (see swimHourScore() in src/js/ai.js).
+    s = 6 + (temp - 20) * 0.15
     if month in [6, 7, 8]:
-        s += 1.5
+        s += 1.0
     if month in [11, 12, 1, 2, 3]:
         s -= 2.0
     if is_rain:
         s -= 2.0
+    # Warm water is the reason to swim: every degree above the 17 °C gate counts.
+    s += (sea_temp - 17.0) * 0.2
     return round(max(0, min(10, s)), 1)
 
 
@@ -247,7 +291,10 @@ def today_recommendations(req: TodayRequest):
     is_rain = rain_flag(req.condition, prob)
     month = datetime.now().month
 
-    c = comfort(temp, wind, uv, prob, is_rain)
+    # Comfort reads the apparent temperature (falling back to the air one),
+    # walk reads the plain air temperature — see comfort()/walk() above.
+    feels_like = req.feels_like if req.feels_like is not None else temp
+    c = comfort(feels_like, req.humidity, wind, uv, prob, is_rain)
     w = walk(temp, wind, uv, prob, is_rain)
     s = swim(temp, sea_temp, month, is_rain, coastal)
 
@@ -297,12 +344,16 @@ def today_recommendations(req: TodayRequest):
             h_prob = h.get("precipitation_probability", 0)
             h_cond = h.get("condition", "")
             h_is_rain = rain_flag(h_cond, h_prob)
-            h_walk = walk(h_temp, h_wind, h_uv, h_prob, h_is_rain)
-            if h_walk > best_walk_score:
-                best_walk_score = h_walk
-                best_walk_time = h_time
-
             h_hour = int(h_time.split(":")[0]) if h_time else now_hour
+
+            # A walk is a daytime plan: only 06:00-21:59 may win the tip, even
+            # when the air is perfect at 03:00 (see WALK_FROM_HOUR in ai.js).
+            if WALK_FROM_HOUR <= h_hour < WALK_UNTIL_HOUR:
+                h_walk = walk(h_temp, h_wind, h_uv, h_prob, h_is_rain)
+                if h_walk > best_walk_score:
+                    best_walk_score = h_walk
+                    best_walk_time = h_time
+
             if coastal and sea_temp and sea_temp > 17 and 10 <= h_hour <= 18:
                 h_swim = swim(h_temp, sea_temp, month, h_is_rain, coastal)
                 if h_swim > best_swim_score:

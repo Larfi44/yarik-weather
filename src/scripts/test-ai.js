@@ -350,9 +350,9 @@ function testScores(yw) {
 
   check('comfort tip is there exactly once', comfort.length === 1);
   check('walk tip is there exactly once', walk.length === 1);
-  // 22 °C, 3 m/s, UV 1, 10 % rain -> comfort 9.05, walk 8.4
-  check('comfort 9.05 is shown as 9', comfort[0] === '⭐ Comfort: 9/10', comfort[0]);
-  check('walk 8.4 is shown as 8', walk[0] === '🚶 Walk: 8/10', walk[0]);
+  // 22 °C, 3 m/s, UV 1, 10 % rain -> comfort 9.8, walk 8.75
+  check('comfort 9.8 is shown as 10', comfort[0] === '⭐ Comfort: 10/10', comfort[0]);
+  check('walk 8.75 is shown as 9', walk[0] === '🚶 Walk: 9/10', walk[0]);
   check(
     'scores keep no decimals at all',
     /^⭐ Comfort: \d{1,2}\/10$/.test(comfort[0] || '') &&
@@ -367,9 +367,189 @@ function testScores(yw) {
   const ru = yw.ai.buildAiData(makeWeather(), 'ru');
   check(
     'russian tips are rounded too',
-    tips(ru, '⭐ Комфорт: 9/10').length === 1 &&
-      tips(ru, '🚶 Прогулка: 8/10').length === 1,
+    tips(ru, '⭐ Комфорт: 10/10').length === 1 &&
+      tips(ru, '🚶 Прогулка: 9/10').length === 1,
     JSON.stringify(ru.recommendations.slice(0, 2)),
+  );
+}
+
+/** The score a "⭐ Comfort: 7/10" / "🏊 Swim: 6/10 (water …)" tip shows. */
+function shownScore(tip) {
+  const match = /(\d+)\/10/.exec(String(tip || ''));
+  return match ? Number(match[1]) : null;
+}
+
+/** The comfort / walk numbers the analysis would show for a `current` block. */
+function shownScores(yw, current) {
+  const data = yw.ai.buildAiData(makeWeather({ current: current }), 'en');
+  return {
+    comfort: shownScore(tips(data, '⭐ Comfort: ')[0]),
+    walk: shownScore(tips(data, '🚶 Walk: ')[0]),
+  };
+}
+
+/**
+ * Comfort and walk used to be one formula with two different ideal
+ * temperatures, so both scores landed on the same number almost every day.
+ * Comfort is about being outside, walk is about moving outside — on an
+ * ordinary day the two numbers have to differ.
+ */
+function testScoresDiffer(yw) {
+  section('Comfort and walk are two different numbers');
+
+  const days = [
+    {
+      name: 'mild and clear',
+      current: {
+        temperature: 22,
+        wind_speed: 3,
+        uv_index: 1,
+        precipitation_probability: 10,
+        humidity: 50,
+        condition: 'Clear',
+      },
+    },
+    {
+      name: 'hot and sunny',
+      current: {
+        temperature: 33,
+        wind_speed: 1,
+        uv_index: 9,
+        precipitation_probability: 0,
+        humidity: 65,
+        condition: 'Clear',
+      },
+    },
+    {
+      name: 'frosty',
+      current: {
+        temperature: -3,
+        wind_speed: 5,
+        uv_index: 0,
+        precipitation_probability: 20,
+        humidity: 80,
+        condition: 'Clear',
+      },
+    },
+    {
+      name: 'rainy and windy',
+      current: {
+        temperature: 15,
+        wind_speed: 6,
+        uv_index: 2,
+        precipitation_probability: 85,
+        humidity: 92,
+        condition: 'Light rain',
+      },
+    },
+    {
+      name: 'muggy evening',
+      current: {
+        temperature: 27,
+        wind_speed: 1,
+        uv_index: 0,
+        precipitation_probability: 0,
+        humidity: 90,
+        condition: 'Clear',
+      },
+    },
+  ];
+
+  days.forEach((day) => {
+    const scores = shownScores(yw, day.current);
+    check(
+      day.name + ': comfort ' + scores.comfort + ' vs walk ' + scores.walk,
+      scores.comfort !== null &&
+        scores.walk !== null &&
+        scores.comfort !== scores.walk,
+      JSON.stringify(scores),
+    );
+  });
+
+  // Rain is what separates them most: at the same temperature it costs the walk
+  // score far more than the comfort score.
+  const dry = shownScores(yw, {
+    temperature: 16,
+    wind_speed: 3,
+    uv_index: 1,
+    precipitation_probability: 0,
+    humidity: 60,
+    condition: 'Clear',
+  });
+  const wet = shownScores(yw, {
+    temperature: 16,
+    wind_speed: 3,
+    uv_index: 1,
+    precipitation_probability: 90,
+    humidity: 60,
+    condition: 'Rain',
+  });
+  check(
+    'rain drops the walk score more than the comfort score',
+    dry.comfort - wet.comfort < dry.walk - wet.walk,
+    JSON.stringify({ dry: dry, wet: wet }),
+  );
+
+  // Walking warms you up: cool air is fine for a walk, not for sitting outside.
+  const cool = shownScores(yw, {
+    temperature: 14,
+    wind_speed: 2,
+    uv_index: 1,
+    precipitation_probability: 0,
+    humidity: 55,
+    condition: 'Clear',
+  });
+  check(
+    'cool air suits a walk better than sitting outside',
+    cool.walk > cool.comfort,
+    JSON.stringify(cool),
+  );
+}
+
+/**
+ * The hourly series covers the whole day, but "best walk time" has to stay in
+ * the 06:00-21:59 window: nobody plans a walk at 04:00 or 23:00.
+ */
+function testBestWalkWindow(yw) {
+  section('Best walk time stays between 06:00 and 22:00');
+
+  // A perfect 04:00 would win on order alone, so it must be skipped.
+  const early = yw.ai.buildAiData(
+    makeWeather({ hourly: [hourRow(TODAY, 4, 18), hourRow(TODAY, 7, 14)] }),
+    'en',
+  );
+  check(
+    'an ideal 04:00 hour is skipped',
+    tips(early, '🚶 Best walk time: ')[0] === '🚶 Best walk time: 07:00',
+    JSON.stringify(tips(early, '🚶')),
+  );
+
+  // A perfect 23:00 outranks a hot 07:00, but is outside the window.
+  const late = yw.ai.buildAiData(
+    makeWeather({ hourly: [hourRow(TODAY, 7, 26), hourRow(TODAY, 23, 18)] }),
+    'en',
+  );
+  check(
+    'an ideal 23:00 hour is skipped',
+    tips(late, '🚶 Best walk time: ')[0] === '🚶 Best walk time: 07:00',
+    JSON.stringify(tips(late, '🚶')),
+  );
+
+  // 05:00 and 22:00 are the edges: only 06:00 is left.
+  const edges = yw.ai.buildAiData(
+    makeWeather({
+      hourly: [
+        hourRow(TODAY, 5, 18),
+        hourRow(TODAY, 6, 18),
+        hourRow(TODAY, 22, 18),
+      ],
+    }),
+    'en',
+  );
+  check(
+    '05:00 and 22:00 are left out',
+    tips(edges, '🚶 Best walk time: ')[0] === '🚶 Best walk time: 06:00',
+    JSON.stringify(tips(edges, '🚶')),
   );
 }
 

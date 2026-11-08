@@ -92,11 +92,13 @@ check('fresh', windRu(9) === 'Свежий', windRu(9));
 check('strong', windRu(12) === 'Сильный', windRu(12));
 check('storm', windRu(20) === 'Штормовой', windRu(20));
 check(
-  'no neuter endings sneak into the wind words',
-  [windRu(3), windRu(6.5), windRu(9), windRu(12), windRu(20)].every(
-    (word) => !/(ое|ее|ий)$/.test(word) || word === 'Свежий' || word === 'Сильный',
+  'every wind word is masculine (noun or -ий/-ый/-ой adjective)',
+  [windRu(0.2), windRu(3), windRu(6.5), windRu(9), windRu(12), windRu(20)].every(
+    (word) => word === 'Штиль' || /(ий|ый|ой)$/.test(word),
   ),
-  [windRu(3), windRu(6.5), windRu(9), windRu(12), windRu(20)].join(', '),
+  [windRu(0.2), windRu(3), windRu(6.5), windRu(9), windRu(12), windRu(20)].join(
+    ', ',
+  ),
 );
 
 section('UV is masculine («УФ: 4.0 (Средний)»)');
@@ -106,9 +108,9 @@ check('high', uvRu(7) === 'Высокий', uvRu(7));
 check('very high', uvRu(9) === 'Очень высокий', uvRu(9));
 check('extreme', uvRu(12) === 'Экстремальный', uvRu(12));
 check(
-  'no neuter endings sneak into the uv words',
-  [uvRu(1), uvRu(4), uvRu(7), uvRu(9), uvRu(12)].every(
-    (word) => !/(ое|ее)$/.test(word),
+  'every uv word is masculine (noun or -ий/-ый/-ой adjective)',
+  [uvRu(1), uvRu(4), uvRu(7), uvRu(9), uvRu(12)].every((word) =>
+    /(ий|ый|ой)$/.test(word),
   ),
   [uvRu(1), uvRu(4), uvRu(7), uvRu(9), uvRu(12)].join(', '),
 );
@@ -118,6 +120,15 @@ check('low', pressureRu(970) === 'Низкое', pressureRu(970));
 check('normal', pressureRu(1000) === 'Нормальное', pressureRu(1000));
 check('high', pressureRu(1020) === 'Высокое', pressureRu(1020));
 check('very high', pressureRu(1050) === 'Очень высокое', pressureRu(1050));
+check(
+  'every pressure word is neuter (noun or -ое/-ее adjective)',
+  [pressureRu(970), pressureRu(1000), pressureRu(1020), pressureRu(1050)].every(
+    (word) => /(ое|ее)$/.test(word),
+  ),
+  [pressureRu(970), pressureRu(1000), pressureRu(1020), pressureRu(1050)].join(
+    ', ',
+  ),
+);
 
 section('English and unknown categories are passed through');
 check('english wind', H.translateCategory('Moderate', 'en') === 'Moderate');

@@ -16,7 +16,22 @@ window.YW = window.YW || {};
   const Language = YW.Language;
   const Theme = YW.Theme;
 
-  // ── Scoring helpers matching ai_service.py ──────────────────────────
+  // ── Scoring helpers (twins of the ones in ai_service.py) ────────────
+  //
+  // Comfort and walk answer two different questions, so they cannot be the
+  // same formula with two tweaked constants (that is what they used to be:
+  // identical wind / rain / probability terms and only the ideal temperature
+  // 3 °C apart, so both scores landed on the same whole number almost every
+  // day). Now:
+  //
+  //   comfort — how pleasant it is to simply be outside: a mild 19-24 °C
+  //             plateau, muggy or bone-dry air, wind chill, sunburn and light
+  //             rain all chip away at it. It reads the *apparent* temperature.
+  //   walk    — how pleasant it is to go for a walk right now: people walk
+  //             best in cooler air (12-20 °C), and rain, gusts and strong sun
+  //             hurt a walk far more than they hurt standing around.
+  //
+  // Both start at 10 and are clamped to the 0..10 range.
 
   /** A metric can be missing (the API sends null): treat unknowns as 0. */
   function num(value) {
@@ -36,27 +51,65 @@ window.YW = window.YW || {};
     return Math.round(Math.max(0, Math.min(10, value)) * 10) / 10;
   }
 
-  function comfortScore(temp, wind, uv, prob, isRain) {
-    const probFraction = num(prob) / 100;
+  /**
+   * Degrees outside [min, max], priced per degree. `coldSlope` applies below
+   * the band, `hotSlope` above it (they default to each other).
+   */
+  function bandPenalty(temp, min, max, coldSlope, hotSlope) {
+    const value = num(temp);
+    const hot = hotSlope === undefined ? coldSlope : hotSlope;
+    if (value < min) return (min - value) * coldSlope;
+    if (value > max) return (value - max) * hot;
+    return 0;
+  }
+
+  /** Whatever is above `threshold`, priced per unit (wind, UV, ...). */
+  function above(value, threshold, slope) {
+    return Math.max(0, num(value) - threshold) * slope;
+  }
+
+  /**
+   * Muggy air (>60 %) wears a person down, bone-dry air (<30 %) irritates the
+   * eyes and throat. A missing reading costs nothing: `num(null)` is not a
+   * dry day.
+   */
+  function airPenalty(humidity) {
+    if (humidity === null || humidity === undefined) return 0;
+    const value = num(humidity);
+    if (!value) return 0;
+    if (value > 60) return (value - 60) * 0.04;
+    if (value < 30) return (30 - value) * 0.03;
+    return 0;
+  }
+
+  /**
+   * Comfort of being outside right now, from the apparent temperature (what
+   * the current card shows as "feels like"), the air itself and the sky.
+   */
+  function comfortScore(feels, humidity, wind, uv, prob, isRain) {
     const s =
       10 -
-      Math.abs(num(temp) - 21) * 0.15 -
-      num(wind) * 0.2 -
-      probFraction * 2 -
-      Math.max(0, num(uv) - 8) * 0.5 -
-      (isRain ? 2 : 0);
+      bandPenalty(feels, 19, 24, 0.3) -
+      airPenalty(humidity) -
+      above(wind, 3, 0.25) -
+      (num(prob) / 100) * 2 -
+      above(uv, 7, 0.6) -
+      (isRain ? 1.5 : 0);
     return clampScore(s);
   }
 
+  /**
+   * Quality of a walk: cooler than comfort (walking warms you up), and much
+   * less forgiving about rain, gusts and strong sun.
+   */
   function walkScore(temp, wind, uv, prob, isRain) {
-    const probFraction = num(prob) / 100;
     const s =
       10 -
-      Math.abs(num(temp) - 18) * 0.2 -
-      num(wind) * 0.2 -
-      probFraction * 2 -
-      (isRain ? 2 : 0) -
-      (num(uv) > 8 ? 1.5 : 0);
+      bandPenalty(temp, 12, 20, 0.35, 0.45) -
+      above(wind, 4, 0.3) -
+      (num(prob) / 100) * 3.5 -
+      above(uv, 5, 0.6) -
+      (isRain ? 3.5 : 0);
     return clampScore(s);
   }
 
@@ -64,50 +117,68 @@ window.YW = window.YW || {};
    * Swim score of a single hour: air temperature, season and rain decide it, so
    * the hours of the day can be ranked even when the sea is too cold for the
    * score itself to be meaningful (that "warm water" rule lives in swimScore).
+   *
+   * The 6-point baseline is deliberately generous: once the water is warm
+   * enough to swim at all, the day is worth a positive number.
    */
   function swimHourScore(temp, month, isRain) {
-    let s = 5 + (num(temp) - 20) * 0.15;
+    let s = 6 + (num(temp) - 20) * 0.15;
     // Summer months bonus
-    if ([6, 7, 8].indexOf(month) !== -1) s += 1.5;
+    if ([6, 7, 8].indexOf(month) !== -1) s += 1;
     // Winter months penalty
     if ([11, 12, 1, 2, 3].indexOf(month) !== -1) s -= 2;
     if (isRain) s -= 2;
     return clampScore(s);
   }
 
+  /**
+   * Swim score of the day. Warm water is the reason to swim at all, so every
+   * degree the sea is above the 17 °C gate adds to the hour score on top of the
+   * air, the season and the rain.
+   */
   function swimScore(temp, seaTemp, month, isRain, coastal) {
     if (!coastal || !seaTemp || seaTemp <= 17) return 0;
-    return swimHourScore(temp, month, isRain);
+    return clampScore(
+      swimHourScore(temp, month, isRain) + (num(seaTemp) - 17) * 0.2,
+    );
   }
+
+  /**
+   * The window the "best walk time" tip may point at — 06:00 until 22:00. The
+   * hourly series covers the whole day (including the night), but a walk is a
+   * daytime plan, so an ideal 03:00 or 23:00 must not win the tip.
+   */
+  const WALK_FROM_HOUR = 6;
+  const WALK_UNTIL_HOUR = 22;
 
   const MONTH_NAMES = {
     ru: [
-      'Янв',
-      'Фев',
-      'Мар',
-      'Апр',
+      'Январь',
+      'Февраль',
+      'Март',
+      'Апрель',
       'Май',
-      'Июн',
-      'Июл',
-      'Авг',
-      'Сен',
-      'Окт',
-      'Ноя',
-      'Дек',
+      'Июнь',
+      'Июль',
+      'Август',
+      'Сентябрь',
+      'Октябрь',
+      'Ноябрь',
+      'Декабрь',
     ],
     en: [
-      'Jan',
-      'Feb',
-      'Mar',
-      'Apr',
+      'January',
+      'February',
+      'March',
+      'April',
       'May',
-      'Jun',
-      'Jul',
-      'Aug',
-      'Sep',
-      'Oct',
-      'Nov',
-      'Dec',
+      'June',
+      'July',
+      'August',
+      'September',
+      'October',
+      'November',
+      'December',
     ],
   };
 
@@ -141,9 +212,12 @@ window.YW = window.YW || {};
     const coastal =
       YW.isCoastal(weather.city) || YW.isCoastal(weather.city_name || '');
 
-    // ── Scores matching ai_service.py exactly ──
+    // ── Scores (comfort reads the apparent temperature, walk the air one) ──
+    const feelsLike =
+      current.feels_like != null ? current.feels_like : current.temperature;
     const cScore = comfortScore(
-      current.temperature,
+      feelsLike,
+      current.humidity,
       current.wind_speed,
       current.uv_index,
       current.precipitation_probability,
@@ -166,10 +240,11 @@ window.YW = window.YW || {};
 
     // ── Recommendations (scores first, so they top the list) ──
     const tips = [];
-    // Comfort and walk are reported as whole numbers: a "7.3/10" next to the
+    // The three scores are reported as whole numbers: a "7.3/10" next to the
     // plain-language tips around it reads like noise.
     const comfort = Math.round(cScore);
     const walk = Math.round(wScore);
+    const swim = Math.round(sScore);
     tips.push(
       t('⭐ Comfort: ' + comfort + '/10', '⭐ Комфорт: ' + comfort + '/10'),
     );
@@ -250,12 +325,12 @@ window.YW = window.YW || {};
         tips.push(
           t(
             '🏊 Swim: ' +
-              sScore +
+              swim +
               '/10 (water ' +
               tempStr(current.sea_temperature) +
               ')',
             '🏊 Купание: ' +
-              sScore +
+              swim +
               '/10 (вода ' +
               tempStr(current.sea_temperature) +
               ')',
@@ -287,23 +362,29 @@ window.YW = window.YW || {};
         }
 
         const hIsRain = rainFlag(hr.condition, hr.precipitation_probability);
-        const hWalk = walkScore(
-          hr.temperature,
-          hr.wind_speed,
-          hr.uv_index,
-          hr.precipitation_probability,
-          hIsRain,
-        );
-        if (hWalk > bestWalkScoreVal) {
-          bestWalkScoreVal = hWalk;
-          bestWalkTime = hr.time;
+        const hHour = hr.time ? parseInt(hr.time.split(':')[0], 10) : nowHour;
+
+        // A walk is a daytime plan: the series holds every hour of the day, and
+        // 03:00 or 23:00 must never win the "best walk time" tip even when the
+        // air happens to be perfect then. Only 06:00-21:59 is eligible.
+        if (hHour >= WALK_FROM_HOUR && hHour < WALK_UNTIL_HOUR) {
+          const hWalk = walkScore(
+            hr.temperature,
+            hr.wind_speed,
+            hr.uv_index,
+            hr.precipitation_probability,
+            hIsRain,
+          );
+          if (hWalk > bestWalkScoreVal) {
+            bestWalkScoreVal = hWalk;
+            bestWalkTime = hr.time;
+          }
         }
 
         // Best swim time: the coastal-city tip the day is ranked by. Only the
         // hours a swim is plausible at are considered (10:00-18:00, like
         // ai_service.py) and the air decides the winner, so the tip shows up
         // even when the water is too cold for a score.
-        const hHour = hr.time ? parseInt(hr.time.split(':')[0], 10) : nowHour;
         if (coastal && hHour >= 10 && hHour <= 18) {
           const hSwim = swimHourScore(hr.temperature, month, hIsRain);
           if (hSwim > bestSwimScoreVal) {

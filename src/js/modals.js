@@ -286,11 +286,14 @@ window.YW = window.YW || {};
           style: { color: textColor() },
           placeholder: en ? 'e.g. Moscow' : 'например, Москва',
           // Mutates the local copy without re-rendering so typing keeps focus.
+          // opts.onChange() is deliberately skipped here: the city only matters
+          // once the settings are saved, and a live repaint rebuilt the whole
+          // weather view on every keystroke (the daily chart looked like it was
+          // reloading). Units, language and theme still preview their changes.
           oninput: (event) => {
             temp = Object.assign({}, temp, {
               default_city: event.target.value,
             });
-            if (typeof opts.onChange === 'function') opts.onChange(temp);
           },
         }),
       ]);

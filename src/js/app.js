@@ -185,9 +185,25 @@ window.YW = window.YW || {};
       else renderWeather();
     }
 
+    /**
+     * The settings the weather view paints with. Edits that only touch text
+     * fields (the default city) leave this untouched, so they must not repaint
+     * the cards and charts.
+     */
+    function paintedSettings(s) {
+      return [s.temp_unit, s.wind_unit, s.pressure_unit, s.language, s.theme].join(
+        '|',
+      );
+    }
+
     /** Live preview while the settings modal is open (no refetch). */
     function handleSettingsChange(next) {
+      // Typing a city name used to repaint here on every keystroke, which made
+      // the daily chart look like it was reloading: only a visible change
+      // (units, language, theme) is worth rebuilding the view for.
+      const repaint = paintedSettings(next) !== paintedSettings(settings);
       settings = next;
+      if (!repaint) return;
       applyTheme();
       renderStatus();
       renderWeather();
