@@ -60,8 +60,12 @@ window.YW = window.YW || {};
     return clampScore(s);
   }
 
-  function swimScore(temp, seaTemp, month, isRain, coastal) {
-    if (!coastal || !seaTemp || seaTemp <= 17) return 0;
+  /**
+   * Swim score of a single hour: air temperature, season and rain decide it, so
+   * the hours of the day can be ranked even when the sea is too cold for the
+   * score itself to be meaningful (that "warm water" rule lives in swimScore).
+   */
+  function swimHourScore(temp, month, isRain) {
     let s = 5 + (num(temp) - 20) * 0.15;
     // Summer months bonus
     if ([6, 7, 8].indexOf(month) !== -1) s += 1.5;
@@ -71,36 +75,9 @@ window.YW = window.YW || {};
     return clampScore(s);
   }
 
-  /** Open-Meteo condition strings -> Russian (used in the AI summary only). */
-  function translateCondition(cond, lang) {
-    if (lang !== Language.Russian) return cond;
-    const map = {
-      clear: 'ясно',
-      sunny: 'солнечно',
-      'partly cloudy': 'переменная облачность',
-      cloudy: 'облачно',
-      overcast: 'пасмурно',
-      fog: 'туман',
-      drizzle: 'морось',
-      'light drizzle': 'лёгкая морось',
-      rain: 'дождь',
-      'light rain': 'небольшой дождь',
-      'moderate rain': 'умеренный дождь',
-      'heavy rain': 'сильный дождь',
-      showers: 'ливень',
-      snow: 'снег',
-      'light snow': 'небольшой снег',
-      'heavy snow': 'сильный снег',
-      sleet: 'мокрый снег',
-      thunderstorm: 'гроза',
-    };
-    const key = String(cond || '').toLowerCase();
-    // Descriptions outside this short list (the WMO wording, "fog", …) are not
-    // in this table: fall back to the shared helper, which knows them too.
-    if (map[key]) return map[key];
-    return YW.helpers && YW.helpers.translateCondition
-      ? YW.helpers.translateCondition(cond, lang)
-      : cond;
+  function swimScore(temp, seaTemp, month, isRain, coastal) {
+    if (!coastal || !seaTemp || seaTemp <= 17) return 0;
+    return swimHourScore(temp, month, isRain);
   }
 
   const MONTH_NAMES = {
@@ -146,6 +123,14 @@ window.YW = window.YW || {};
     const now = new Date();
     const month = now.getMonth() + 1; // 1-indexed, matching ai_service.py
 
+    // Temperatures follow the unit picked in the settings, like every other
+    // number in the app (the analysis itself always works in Celsius).
+    const tempUnit = YW.settings.getSettings().temp_unit;
+    const tempUnitStr = YW.settings.tempUnitStr(tempUnit);
+    /** A Celsius temperature as shown in the modal: whole degrees + unit. */
+    const tempStr = (celsius) =>
+      Math.round(YW.helpers.convertTemp(celsius, tempUnit)) + tempUnitStr;
+
     const cond = String(current.condition || '').toLowerCase();
     const isRain = rainFlag(
       current.condition,
@@ -181,12 +166,14 @@ window.YW = window.YW || {};
 
     // ── Recommendations (scores first, so they top the list) ──
     const tips = [];
+    // Comfort and walk are reported as whole numbers: a "7.3/10" next to the
+    // plain-language tips around it reads like noise.
+    const comfort = Math.round(cScore);
+    const walk = Math.round(wScore);
     tips.push(
-      t('⭐ Comfort: ' + cScore + '/10', '⭐ Комфорт: ' + cScore + '/10'),
+      t('⭐ Comfort: ' + comfort + '/10', '⭐ Комфорт: ' + comfort + '/10'),
     );
-    tips.push(
-      t('🚶 Walk: ' + wScore + '/10', '🚶 Прогулка: ' + wScore + '/10'),
-    );
+    tips.push(t('🚶 Walk: ' + walk + '/10', '🚶 Прогулка: ' + walk + '/10'));
 
     if (cond.indexOf('rain') !== -1 || cond.indexOf('drizzle') !== -1) {
       if (cond.indexOf('heavy') !== -1 || cond.indexOf('violent') !== -1) {
@@ -265,13 +252,13 @@ window.YW = window.YW || {};
             '🏊 Swim: ' +
               sScore +
               '/10 (water ' +
-              current.sea_temperature.toFixed(0) +
-              '°C)',
+              tempStr(current.sea_temperature) +
+              ')',
             '🏊 Купание: ' +
               sScore +
               '/10 (вода ' +
-              current.sea_temperature.toFixed(0) +
-              '°C)',
+              tempStr(current.sea_temperature) +
+              ')',
           ),
         );
       } else {
@@ -312,22 +299,13 @@ window.YW = window.YW || {};
           bestWalkTime = hr.time;
         }
 
-        // Best swim time (like ai_service.py's logic: between 10:00-18:00)
+        // Best swim time: the coastal-city tip the day is ranked by. Only the
+        // hours a swim is plausible at are considered (10:00-18:00, like
+        // ai_service.py) and the air decides the winner, so the tip shows up
+        // even when the water is too cold for a score.
         const hHour = hr.time ? parseInt(hr.time.split(':')[0], 10) : nowHour;
-        if (
-          coastal &&
-          current.sea_temperature != null &&
-          current.sea_temperature > 17 &&
-          hHour >= 10 &&
-          hHour <= 18
-        ) {
-          const hSwim = swimScore(
-            hr.temperature,
-            current.sea_temperature,
-            month,
-            hIsRain,
-            coastal,
-          );
+        if (coastal && hHour >= 10 && hHour <= 18) {
+          const hSwim = swimHourScore(hr.temperature, month, hIsRain);
           if (hSwim > bestSwimScoreVal) {
             bestSwimScoreVal = hSwim;
             bestSwimTime = hr.time;
@@ -502,31 +480,6 @@ window.YW = window.YW || {};
 
     return {
       recommendations: tips,
-      summary:
-        t(
-          'Current conditions in ' +
-            weather.city +
-            ': ' +
-            num(current.temperature) +
-            '°C, ' +
-            cond,
-          'Текущие условия в городе ' +
-            weather.city +
-            ': ' +
-            num(current.temperature) +
-            '°C, ' +
-            translateCondition(current.condition, language),
-        ) +
-        (current.precipitation_probability != null
-          ? t(
-              '. ' +
-                Math.round(current.precipitation_probability) +
-                '% chance of precipitation.',
-              '. Вероятность осадков ' +
-                Math.round(current.precipitation_probability) +
-                '%.',
-            )
-          : '.'),
       comfortScore: cScore,
       walkScore: wScore,
       swimScore: sScore,
@@ -552,8 +505,17 @@ window.YW = window.YW || {};
     const theme = opts.theme || Theme.Light;
     const isDark = theme === Theme.Dark;
     const aiColor = isDark ? '#60a5fa' : '#2563eb';
-    const language = YW.settings.getSettings().language;
+    const settings = YW.settings.getSettings();
+    const language = settings.language;
     const t = (en, ru) => (language === Language.Russian ? ru : en);
+
+    // The outlook is the only place the modal shows predicted temperatures, so
+    // they follow the unit picked in the settings just like the main screen.
+    const tempUnitStr = YW.settings.tempUnitStr(settings.temp_unit);
+    const tempStr = (celsius) =>
+      Math.round(YW.helpers.convertTemp(celsius, settings.temp_unit)) +
+      tempUnitStr;
+    const rainUnit = t('mm', 'мм');
 
     // Nothing to analyse yet (e.g. the very first load).
     if (!weather || !weather.current) return null;
@@ -690,9 +652,6 @@ window.YW = window.YW || {};
       if (data && Array.isArray(data.recommendations)) {
         recommendations.push.apply(recommendations, data.recommendations);
       }
-      if (data && typeof data.summary === 'string') {
-        recommendations.push(data.summary);
-      }
 
       const children = [
         h(
@@ -763,14 +722,14 @@ window.YW = window.YW || {};
           statRow(
             '🌡️',
             t('Average temperature', 'Средняя температура'),
-            week.avg_temp + '°',
+            tempStr(week.avg_temp),
           ),
         ];
         // Rain and UV can still be missing for some points: show them when
         // the answer has them.
         if (week.total_rain != null) {
           weekRows.push(
-            statRow('🌧️', t('Rain', 'Дождь'), week.total_rain + 'mm'),
+            statRow('🌧️', t('Rain', 'Дождь'), week.total_rain + rainUnit),
           );
         }
         if (week.max_uv != null) {
@@ -811,12 +770,12 @@ window.YW = window.YW || {};
             statRow(
               '🌡️',
               t('Average temperature', 'Средняя температура'),
-              m.avg_temp + '°',
+              tempStr(m.avg_temp),
             ),
           ];
           if (m.total_rain != null) {
             monthRows.push(
-              statRow('🌧️', t('Rain', 'Дождь'), m.total_rain + 'mm'),
+              statRow('🌧️', t('Rain', 'Дождь'), m.total_rain + rainUnit),
             );
           }
           if (m.max_uv != null) {

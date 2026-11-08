@@ -449,12 +449,18 @@ window.YW = window.YW || {};
         ' ' +
         ctx.wStr +
         ' (' +
-        H.translateCategory(windCat, lang) +
+        H.translateCategory(windCat, lang, 'masculine') +
         ')';
       const precipS =
         (lang === Language.English ? 'Precipitation' : 'Осадки') +
         ': ' +
         Math.round(hour.precipitation_probability) +
+        '%';
+      const humidityS =
+        '💧 ' +
+        (lang === Language.English ? 'Humidity' : 'Влажность') +
+        ': ' +
+        Math.round(hour.humidity) +
         '%';
       const pressureVal = H.convertPressure(hour.pressure, ctx.pressure_unit);
       const pressureS =
@@ -468,9 +474,15 @@ window.YW = window.YW || {};
         ')';
       const uvS =
         '☀️ ' +
+        (lang === Language.English ? 'UV' : 'УФ') +
+        ': ' +
         (hour.uv_index || 0).toFixed(1) +
         ' (' +
-        H.translateCategory(H.uvCategory(hour.uv_index || 0), lang) +
+        H.translateCategory(
+          H.uvCategory(hour.uv_index || 0),
+          lang,
+          'masculine',
+        ) +
         ')';
 
       const lines = [
@@ -487,6 +499,10 @@ window.YW = window.YW || {};
       // made-up zero.
       if (hour.precipitation_probability != null) {
         lines.push('🌧️ ' + precipS);
+      }
+      // Humidity belongs next to the other readings, right before the pressure.
+      if (hour.humidity != null) {
+        lines.push(humidityS);
       }
       if (hour.pressure != null) {
         lines.push('📊 ' + pressureS);
@@ -566,7 +582,7 @@ window.YW = window.YW || {};
           ' ' +
           ctx.wStr +
           ' (' +
-          H.translateCategory(windCat, lang) +
+          H.translateCategory(windCat, lang, 'masculine') +
           ')',
       ];
 
@@ -584,9 +600,15 @@ window.YW = window.YW || {};
       if (day.uv_index_max != null) {
         lines.push(
           '☀️ ' +
+            (lang === Language.English ? 'UV' : 'УФ') +
+            ': ' +
             day.uv_index_max.toFixed(1) +
             ' (' +
-            H.translateCategory(H.uvCategory(day.uv_index_max), lang) +
+            H.translateCategory(
+              H.uvCategory(day.uv_index_max),
+              lang,
+              'masculine',
+            ) +
             ')',
         );
       }
@@ -642,10 +664,29 @@ window.YW = window.YW || {};
             ' ' +
             ctx.wStr +
             ' (' +
-            H.translateCategory(H.windCategory(current.wind_speed), lang) +
+            H.translateCategory(
+              H.windCategory(current.wind_speed),
+              lang,
+              'masculine',
+            ) +
             ')',
         ),
       );
+
+      // Precipitation leads the optional metrics, humidity follows it.
+      if (current.precipitation_probability != null) {
+        details.push(
+          h(
+            'p',
+            {},
+            '🌧️ ' +
+              (en ? 'Precipitation' : 'Осадки') +
+              ': ' +
+              Math.round(current.precipitation_probability) +
+              '%',
+          ),
+        );
+      }
 
       if (current.humidity != null) {
         details.push(
@@ -661,8 +702,8 @@ window.YW = window.YW || {};
         );
       }
 
-      // Pressure, UV and rain probability can be missing from an answer: omit
-      // the rows instead of showing zeros.
+      // Pressure and UV can be missing from an answer: omit the rows instead of
+      // showing zeros.
       if (current.pressure != null) {
         details.push(
           h(
@@ -682,19 +723,6 @@ window.YW = window.YW || {};
           ),
         );
       }
-      if (current.precipitation_probability != null) {
-        details.push(
-          h(
-            'p',
-            {},
-            '🌧️ ' +
-              (en ? 'Precipitation' : 'Осадки') +
-              ': ' +
-              Math.round(current.precipitation_probability) +
-              '%',
-          ),
-        );
-      }
       if (current.uv_index != null) {
         details.push(
           h(
@@ -705,7 +733,11 @@ window.YW = window.YW || {};
               ': ' +
               current.uv_index.toFixed(1) +
               ' (' +
-              H.translateCategory(H.uvCategory(current.uv_index), lang) +
+              H.translateCategory(
+                H.uvCategory(current.uv_index),
+                lang,
+                'masculine',
+              ) +
               ')',
           ),
         );

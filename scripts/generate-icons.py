@@ -9,7 +9,14 @@ Uses PIL to render the SVG to a 1024x1024 master PNG, then invokes
 import os, sys, subprocess, tempfile
 from PIL import Image
 
-SOURCE = os.path.join(os.path.dirname(__file__), "..", "frontend", "public", "favicon.svg")
+# The icon moved to src/assets/favicon.svg when the frontend was flattened;
+# keep the old frontend/public/ location as a fallback so either layout works.
+_HERE = os.path.dirname(os.path.abspath(__file__))
+_ICON_CANDIDATES = [
+    os.path.join(_HERE, "..", "src", "assets", "favicon.svg"),
+    os.path.join(_HERE, "..", "frontend", "public", "favicon.svg"),
+]
+SOURCE = next((p for p in _ICON_CANDIDATES if os.path.isfile(p)), _ICON_CANDIDATES[0])
 TEMP_MASTER = "/tmp/yarik-weather-icon-master.png"
 ICONS_DIR = os.path.join(os.path.dirname(__file__), "..", "src-tauri", "icons")
 

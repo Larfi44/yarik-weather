@@ -209,7 +209,6 @@ window.YW = window.YW || {};
     function openSettingsModal() {
       YW.modals.openSettings({
         settings: settings,
-        isTauri: runningInTauri,
         onChange: handleSettingsChange,
         onSave: handleSaveSettings,
       });
@@ -250,7 +249,7 @@ window.YW = window.YW || {};
       downloadsBtn.style.display = 'none';
     } else {
       downloadsBtn.addEventListener('click', () => {
-        YW.modals.openDownloads({ lang: settings.language, isTauri: false });
+        YW.modals.openDownloads({ lang: settings.language });
       });
     }
 

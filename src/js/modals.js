@@ -61,17 +61,15 @@ window.YW = window.YW || {};
     return { overlay: overlay, modal: modal, close: close };
   }
 
-  /** Opens a URL: through the Tauri opener in the app, a new tab on the web. */
-  function openExternal(url, isTauri) {
-    if (isTauri) {
-      YW.tauri.openExternal(url);
-    } else {
-      window.open(url, '_blank', 'noopener,noreferrer');
-    }
-  }
-
-  /** External <a> link (styled inline) that routes through openExternal. */
-  function externalLink(url, label, style, isTauri, className) {
+  /**
+   * External <a> link (styled inline).
+   *
+   * No click handler on purpose: the document-wide router in tauri.js opens any
+   * anchor that points outside the app in the system browser, and the Rust
+   * navigation guard (src-tauri/src/lib.rs) cancels such navigations natively,
+   * so a link can never load a web page inside the app window.
+   */
+  function externalLink(url, label, style, className) {
     return h(
       'a',
       {
@@ -80,10 +78,6 @@ window.YW = window.YW || {};
         rel: 'noopener noreferrer',
         class: className || null,
         style: style,
-        onclick: (event) => {
-          event.preventDefault();
-          openExternal(url, isTauri);
-        },
       },
       label,
     );
@@ -93,7 +87,6 @@ window.YW = window.YW || {};
 
   function openSettings(options) {
     const opts = options || {};
-    const isTauri = !!opts.isTauri;
     let temp = Object.assign(
       {},
       opts.settings || Settings.getDefaultSettings(),
@@ -332,7 +325,7 @@ window.YW = window.YW || {};
               { style: { color: textColor() } },
               en ? 'Developed by ' : 'Разработано ',
             ),
-            externalLink(STUDIO_URL, 'Yarik Studio', studioStyle, isTauri),
+            externalLink(STUDIO_URL, 'Yarik Studio', studioStyle),
           ],
         ),
         h(
@@ -349,7 +342,6 @@ window.YW = window.YW || {};
               SUPPORT_URL,
               '🛠️ ' + (en ? 'Technical support' : 'Техподдержка'),
               null,
-              isTauri,
               'settings-cta settings-cta-support',
             ),
           ],
@@ -368,7 +360,7 @@ window.YW = window.YW || {};
               'button',
               {
                 class: 'settings-cta settings-cta-donate',
-                onclick: () => openExternal(DONATE_URL, isTauri),
+                onclick: () => YW.tauri.openExternal(DONATE_URL),
               },
               en ? '❤️ Donate' : '❤️ Поддержать',
             ),
@@ -533,7 +525,6 @@ window.YW = window.YW || {};
   function openDownloads(options) {
     const opts = options || {};
     const lang = opts.lang || Language.English;
-    const isTauri = !!opts.isTauri;
     const en = lang === Language.English;
     const shell = createModalShell('download-modal', { onClose: opts.onClose });
 
@@ -572,10 +563,6 @@ window.YW = window.YW || {};
           class: 'primary-btn download-confirm-btn',
           href: ANDROID_URL,
           style: { textDecoration: 'none', display: 'inline-block' },
-          onclick: (event) => {
-            event.preventDefault();
-            openExternal(ANDROID_URL, isTauri);
-          },
         },
         en ? 'Download' : 'Скачать',
       ),

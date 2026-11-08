@@ -16,13 +16,33 @@ window.YW = window.YW || {};
 
   // ── Assets ──
 
+  // The dev server serves the repository root, so this file is requested as
+  // `src/js/helpers.js` and the images live in `src/assets/`. A build flattens
+  // the tree into `src/out/`, where the very same script is `js/helpers.js`
+  // and the images are `assets/` — that is why the bundled copy of index.html
+  // gets its `"src/` prefixes rewritten to `"./`. HTML alone can be rewritten
+  // like that without a bundler, so a JS asset path has to cope with both
+  // layouts itself: take the prefix from the URL this script was loaded from,
+  // which keeps a single `src/assets/...` spelling working in the repo, in the
+  // built site and in the APK.
+  const scriptSrc =
+    (typeof document !== 'undefined' &&
+      document.currentScript &&
+      document.currentScript.src) ||
+    '';
+  const ASSET_PREFIX = /\/src\/js\//.test(scriptSrc) ? './src/' : './';
+
   /**
-   * Returns the path for a static asset. Always uses a *relative* path so the
-   * site works from any sub-path (e.g. GitVerse Pages /yarik-weather/) as well
-   * as from the root of the Tauri bundle.
+   * Returns the path for a static asset, e.g. `assetUrl('src/assets/logo.svg')`.
+   *
+   * Always resolves to a *relative* path so the site works from any sub-path
+   * (e.g. GitVerse Pages /yarik-weather/) as well as from the root of the
+   * Tauri bundle.
    */
   function assetUrl(path) {
-    return './' + path.replace(/^\//, '');
+    return (
+      ASSET_PREFIX + String(path).replace(/^\/?src\//, '').replace(/^\//, '')
+    );
   }
 
   // ── Conversions ──
@@ -235,10 +255,12 @@ window.YW = window.YW || {};
     if (lower.indexOf('thunder') !== -1) return 'Гроза';
     if (lower.indexOf('tornado') !== -1) return 'Смерч';
     if (lower.indexOf('squall') !== -1) return 'Шквал';
-    if (lower.indexOf('snow') !== -1 || lower.indexOf('sleet') !== -1) return 'Снег';
+    if (lower.indexOf('snow') !== -1 || lower.indexOf('sleet') !== -1)
+      return 'Снег';
     if (lower.indexOf('freezing') !== -1) return 'Ледяной дождь';
     if (lower.indexOf('drizzle') !== -1) return 'Морось';
-    if (lower.indexOf('rain') !== -1 || lower.indexOf('shower') !== -1) return 'Дождь';
+    if (lower.indexOf('rain') !== -1 || lower.indexOf('shower') !== -1)
+      return 'Дождь';
     if (lower.indexOf('overcast') !== -1) return 'Пасмурно';
     if (lower.indexOf('broken clouds') !== -1) return 'Облачно с прояснениями';
     if (lower.indexOf('scattered clouds') !== -1) return 'Рассеянные облака';
@@ -255,18 +277,24 @@ window.YW = window.YW || {};
     return '';
   }
 
+  /**
+   * Russian category words. One category is shared by metrics whose nouns
+   * have different genders: «давление» is neuter («Высокое»), while «ветер»
+   * and «УФ-индекс» are masculine («Высокий»), so both forms are stored and
+   * translateCategory() picks the right one.
+   */
   const CATEGORY_RU = {
-    Low: 'Низкий',
-    Moderate: 'Средний',
-    High: 'Высокий',
-    'Very High': 'Очень высокий',
-    Extreme: 'Экстремальный',
-    Normal: 'Нормальное',
-    Calm: 'Штиль',
-    Light: 'Лёгкий',
-    Fresh: 'Средний',
-    Strong: 'Сильный',
-    Storm: 'Шторм',
+    Low: { neuter: 'Низкое', masculine: 'Низкий' },
+    Moderate: { neuter: 'Среднее', masculine: 'Средний' },
+    High: { neuter: 'Высокое', masculine: 'Высокий' },
+    'Very High': { neuter: 'Очень высокое', masculine: 'Очень высокий' },
+    Extreme: { neuter: 'Экстремальное', masculine: 'Экстремальный' },
+    Normal: { neuter: 'Нормальное', masculine: 'Нормальный' },
+    Calm: { neuter: 'Штиль', masculine: 'Штиль' },
+    Light: { neuter: 'Лёгкое', masculine: 'Лёгкий' },
+    Fresh: { neuter: 'Свежее', masculine: 'Свежий' },
+    Strong: { neuter: 'Сильное', masculine: 'Сильный' },
+    Storm: { neuter: 'Штормовое', masculine: 'Штормовой' },
   };
 
   const MOON_PHASE_RU = {
@@ -321,9 +349,16 @@ window.YW = window.YW || {};
     );
   }
 
-  function translateCategory(cat, lang) {
+  /**
+   * Translates a metric category. `gender` picks the Russian adjective form:
+   * the default neuter one suits «давление» («Высокое»), pass 'masculine' for
+   * «ветер» and «УФ-индекс» («Высокий»).
+   */
+  function translateCategory(cat, lang, gender) {
     if (lang === Language.English) return cat;
-    return CATEGORY_RU[cat] || cat;
+    const forms = CATEGORY_RU[cat];
+    if (!forms) return cat;
+    return forms[gender] || forms.neuter;
   }
 
   function translateMoonPhase(phase, lang) {
@@ -363,7 +398,8 @@ window.YW = window.YW || {};
     const weekdays_en = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
     const weekdays_ru = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
     const wd = (date.getDay() + 6) % 7; // Monday = 0
-    const weekday = lang === Language.English ? weekdays_en[wd] : weekdays_ru[wd];
+    const weekday =
+      lang === Language.English ? weekdays_en[wd] : weekdays_ru[wd];
     return label + ' (' + weekday + ')';
   }
 
